@@ -82,12 +82,12 @@ def sentence_enum(tokens):
     return n
 
 def get_opposites():
-	with open(impresources.files("DPLS") / "data" / "opposites.json", 'r') as f:
+	with open(impresources.files("DPMLM") / "data" / "opposites.json", 'r') as f:
 		opposites = json.load(f)
 	return opposites
 
 def get_vocab():
-	with open(impresources.files("DPLS") / "data" / "vocab.txt", 'r') as f:
+	with open(impresources.files("DPMLM") / "data" / "vocab.txt", 'r') as f:
 		vocab = set([x.strip() for x in f.readlines()])
 	return vocab
 
