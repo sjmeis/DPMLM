@@ -422,7 +422,10 @@ class DPMLM():
         return predictions
     
     def dpmlm_rewrite(self, sentence, epsilon, REPLACE=False, FILTER=False, STOP=False, TEMP=True, POS=True, CONCAT=True):
-        tokens = nltk.word_tokenize(sentence)
+        if isinstance(sentence, list):
+            tokens = sentence
+        else:
+            tokens = nltk.word_tokenize(sentence)
 
         if isinstance(epsilon, list):
             word_eps = epsilon
