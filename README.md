@@ -9,3 +9,5 @@
 
 In order to use `LLMDP.DPParaphrase`, you must download the fine-tuned model directory.
 This can be found at the following link: [Model](https://drive.google.com/drive/folders/1w_6MHQEw9LGkOHx_K1tc6t9djzrprITp?usp=sharing)
+
+Also you will need to download the wordnet 2022 corpus: `python -m wn download oewn:2022`
