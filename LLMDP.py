@@ -59,7 +59,7 @@ class DPPrompt():
 
         prompt = self.prompt_template_fn(text)
 
-        model_inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
+        model_inputs = self.tokenizer(prompt, max_length=512, truncation=True, return_tensors="pt").to(self.device)
         output = self.model.generate(
             **model_inputs,
             do_sample = True,
@@ -122,16 +122,18 @@ class DPBart():
     c_max = None
     delta = None
 
-    def __init__(self, model='facebook/bart-base', num_sigmas=4):
+    def __init__(self, model='facebook/bart-base', num_sigmas=1/2):
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+
         self.tokenizer = BartTokenizer.from_pretrained(model)
-        self.model = BartModel.from_pretrained(model)
-        self.decoder = BartForConditionalGeneration.from_pretrained(model)
+        self.model = BartModel.from_pretrained(model).to(self.device)
+        self.decoder = BartForConditionalGeneration.from_pretrained(model).to(self.device)
 
         self.delta = 1e-5
         self.sigma = 0.2
         self.num_sigmas = num_sigmas
         self.c_min = -self.sigma
-        self.c_max = 2 * self.sigma
+        self.c_max = self.num_sigmas * self.sigma
 
     def clip(self, vector):
         return torch.clip(vector, self.c_min, self.c_max)
@@ -219,11 +221,11 @@ class DPBart():
         return vector + Z
 
     def privatize(self, text, epsilon=100, method="gaussian"):
-        inputs = self.tokenizer(text, return_tensors="pt")
+        inputs = self.tokenizer(text, max_length=512, truncation=True, return_tensors="pt").to(self.device)
         num_tokens = len(inputs["input_ids"][0])
 
         enc_output = self.model.encoder(**inputs)
-        enc_output["last_hidden_state"] = self.noise(self.clip(enc_output["last_hidden_state"]), epsilon=epsilon, delta=self.delta, method=method).float()
+        enc_output["last_hidden_state"] = self.noise(self.clip(enc_output["last_hidden_state"].cpu()), epsilon=epsilon, delta=self.delta, method=method).float().to(self.device)
 
         dec_out = self.decoder.generate(encoder_outputs=enc_output, max_new_tokens=num_tokens)
         private_text = self.tokenizer.decode(dec_out[0], skip_special_tokens=True)

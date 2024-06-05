@@ -469,3 +469,67 @@ class DPMLM():
             total += 1
 
         return self.detokenizer.detokenize(replace), perturbed, total
+    
+    def dpmlm_rewrite_plus(self, sentence, epsilon, FILTER=False, TEMP=True, POS=True, CONCAT=True, ADD_PROB=0.15, DEL_PROB=0.05):
+        if isinstance(sentence, list):
+            tokens = sentence
+        else:
+            tokens = nltk.word_tokenize(sentence)
+
+        if isinstance(epsilon, list):
+            word_eps = epsilon
+        else:
+            word_eps = [epsilon for _ in range(len(tokens))] #epsilon #/ num_tokens
+        n = sentence_enum(tokens)
+        replace = []
+        new_tokens = [str(x) for x in tokens]
+
+        perturbed = 0
+        total = 0
+        deleted = 0
+        added = 0
+
+        for i, (t, nn, eps) in enumerate(zip(tokens, n, word_eps)):
+            if t in string.punctuation:
+                total += 1
+                replace.append(t)
+                continue
+
+            if i == len(tokens) - 1:
+                DELETE = 1
+            else:
+                DELETE = np.random.rand()
+            if DELETE >= DEL_PROB:
+                new_s = " ".join(new_tokens)
+                new_n = sentence_enum(new_tokens)
+                res = self.privatize(sentence, t, n=new_n[i+added-deleted], ENGLISH=True, FILTER=FILTER, epsilon=eps, MS=new_s, TEMP=TEMP, POS=POS, CONCAT=CONCAT)
+                r = res[t+"_{}".format(new_n[i+added-deleted])]
+                if i+added-deleted > len(new_tokens) - 1:
+                    new_tokens.insert(i+added-deleted, r)
+                else:
+                    new_tokens[i+added-deleted] = r
+                replace.append(r)
+
+                if r != t:
+                    perturbed += 1
+                total += 1
+            else:
+                new_n = sentence_enum(new_tokens)
+                temp = nth_rem(" ".join(new_tokens), t, new_n[i+added-deleted])
+                new_tokens = [str(x) for x in temp.split()]
+                deleted += 1
+                continue
+
+            ADD = np.random.rand()
+            if ADD <= ADD_PROB:
+                tokens_copy = new_tokens.copy()
+                tokens_copy.insert(i+1+added-deleted, "MASK")
+                new_s = " ".join(tokens_copy)
+                new_n = sentence_enum(new_tokens)
+                res = self.privatize(sentence, "MASK", n=1, ENGLISH=True, FILTER=FILTER, epsilon=eps, MS=new_s, TEMP=TEMP, POS=POS, CONCAT=CONCAT)
+                r = res["MASK_1"]
+                new_tokens.insert(i+1+added-deleted, r)
+                replace.append(r)
+                added += 1
+
+        return self.detokenizer.detokenize(replace), perturbed, total, added, deleted
