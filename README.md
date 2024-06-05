@@ -10,10 +10,12 @@ Otherwise, there are two main files, both of which arte easily importable and re
 
 ## Usage of DP-MLM
 `M = DPMLM.DPMLM()`
+
 `M.dpmlm_rewrite("hello world", epsilon=100)`
 
 ## Usage of other evaluated models
 `M = LLMDP.DPPrompt()`
+
 `M.privatize("hello world", epsilon=100)`
 
 ## Important notes
