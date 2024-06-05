@@ -25,16 +25,6 @@ logging.set_verbosity_warning()
 
 stop = set([x for x in stopwords.words("english")])
 
-def exponential(target, cands, epsilon):
-    if len(cands) == 0:
-        return target
-    
-    R = [cand[0] for cand in cands]
-    scores = [cand[1] for cand in cands]
-    probabilities = [np.exp(epsilon * score / 2) for score in scores]
-    probabilities = probabilities / np.linalg.norm(probabilities, ord=1)
-    return np.random.choice(R, 1, p=probabilities)[0]
-
 def nth_repl(s, sub, repl, n):
     s_split = s.split()
     i = 0
