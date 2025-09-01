@@ -1,4 +1,4 @@
-# DPMLM
+# DP-MLM
 This is the code repository for the ACL Findings paper: *DP-MLM: Differentially Private Text Rewriting Using Masked Language Models*
 
 ## Setup
