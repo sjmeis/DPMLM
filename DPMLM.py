@@ -459,7 +459,6 @@ class DPMLM():
         #logits = output[0].squeeze().detach().cpu().numpy()
         logits = output.logits
         batch_size, _, _ = logits.shape
-        logits = output[0].squeeze().detach().cpu().numpy()
 
         predictions = {}
         #for t, m, nn in zip(target, masked_position, n):
@@ -467,12 +466,12 @@ class DPMLM():
             current = "{}_{}".format(targets[i], n[i])
 
             #Get top guesses: their token IDs, scores, and words.
-            mask_logits = logits[i][masked_position[i]].squeeze()
+            mask_logits = logits[i][masked_position[i]].squeeze().detach().cpu().numpy()
             mask_logits = np.clip(mask_logits, self.clip_min, self.clip_max)
             mask_logits = mask_logits / (2 * self.sensitivity / epsilon[i])
 
             logits_idx = [j for j, x in enumerate(mask_logits)]
-            scores = torch.softmax(mask_logits, dim=0)
+            scores = torch.softmax(torch.from_numpy(mask_logits), dim=0)
             scores = scores / scores.sum()
             chosen_idx = np.random.choice(logits_idx, p=scores.numpy())
             predictions[current] = (self.tokenizer.decode(chosen_idx).strip(), scores[chosen_idx])
