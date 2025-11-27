@@ -230,3 +230,18 @@ class DPBart():
         dec_out = self.decoder.generate(encoder_outputs=enc_output, max_new_tokens=num_tokens)
         private_text = self.tokenizer.decode(dec_out[0], skip_special_tokens=True)
         return private_text.strip()
+
+    def privatize_multi(self, text, epsilon=100, method="gaussian", N=3):
+        inputs = self.tokenizer(text, max_length=512, truncation=True, return_tensors="pt").to(self.device)
+        num_tokens = len(inputs["input_ids"][0])
+
+        enc_output = self.model.encoder(**inputs)
+        temp = []
+        for _ in range(N):
+            Z = self.noise(self.clip(enc_output["last_hidden_state"].cpu()), epsilon=epsilon/N, delta=self.delta, method=method).float().to(self.device)
+            temp.append(Z)
+        enc_output["last_hidden_state"] = torch.stack(temp).mean(dim=0)
+
+        dec_out = self.decoder.generate(encoder_outputs=enc_output, max_new_tokens=num_tokens)
+        private_text = self.tokenizer.decode(dec_out[0], skip_special_tokens=True)
+        return private_text.strip()
