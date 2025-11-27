@@ -458,8 +458,8 @@ class DPMLM():
         
         #logits = output[0].squeeze().detach().cpu().numpy()
         logits = output.logits
-
         batch_size, _, _ = logits.shape
+        logits = output[0].squeeze().detach().cpu().numpy()
 
         predictions = {}
         #for t, m, nn in zip(target, masked_position, n):
