@@ -411,6 +411,77 @@ class DPMLM():
 
         return predictions
     
+    def privatize_batch(self, sentences, targets, n, epsilon, K=5, CONCAT=True, FILTER=True, POS=False, ENGLISH=False, MS=None):
+        split_sents = [nltk.word_tokenize(sentence) for sentence in sentences]
+        original_sents = [' '.join(split_sent) for split_sent in split_sents]
+
+        # Masks the target word in the original sentence.
+        if MS is None:
+            masked_sents = [' '.join(split_sent) for split_sent in split_sents]
+        else:
+            masked_sents = MS
+
+        for i, (t, nn) in enumerate(zip(targets, n)):
+            masked_sents[i] = nth_repl(masked_sents[i], t, self.tokenizer.mask_token, nn)
+
+        #Get the input token IDs of the input consisting of: the original sentence + separator + the masked sentence.
+        if CONCAT == False:
+            inputs = self.tokenizer(
+                masked_sents,
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+                add_special_tokens=True
+            )
+        else:
+            original_sents = [" "+x.replace("MASK", "") for x in original_sents]
+            masked_sents = [" "+x for x in masked_sents]
+
+            inputs = self.tokenizer(
+                text=original_sents,
+                text_pair=masked_sents,
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+                add_special_tokens=True
+            )
+
+        inputs = {k: v.to(self.device) for k, v in inputs.items()}
+
+        masked_position = (inputs['input_ids'] == self.tokenizer.mask_token_id)
+
+        #original_output = self.raw_model(**inputs)
+
+        #Get the predictions of the Masked LM transformer.
+        with torch.no_grad():
+            output = self.lm_model(**inputs)
+        
+        #logits = output[0].squeeze().detach().cpu().numpy()
+        logits = output.logits
+
+        batch_size, _, _ = logits.shape
+
+        predictions = {}
+        #for t, m, nn in zip(target, masked_position, n):
+        for i in range(batch_size):
+            current = "{}_{}".format(targets[i], n[i])
+
+            #Get top guesses: their token IDs, scores, and words.
+            mask_logits = logits[i][masked_position[i]].squeeze()
+            mask_logits = np.clip(mask_logits, self.clip_min, self.clip_max)
+            mask_logits = mask_logits / (2 * self.sensitivity / epsilon[i])
+
+            logits_idx = [j for j, x in enumerate(mask_logits)]
+            scores = torch.softmax(mask_logits, dim=0)
+            scores = scores / scores.sum()
+            chosen_idx = np.random.choice(logits_idx, p=scores.numpy())
+            predictions[current] = (self.tokenizer.decode(chosen_idx).strip(), scores[chosen_idx])
+
+        for p in predictions:
+            predictions[p] = predictions[p][0]
+
+        return predictions
+    
     def dpmlm_rewrite(self, sentence, epsilon, REPLACE=False, FILTER=False, STOP=False, TEMP=True, POS=True, CONCAT=True):
         if isinstance(sentence, list):
             tokens = sentence
@@ -459,6 +530,28 @@ class DPMLM():
             total += 1
 
         return self.detokenizer.detokenize(replace), perturbed, total
+    
+    def dpmlm_rewrite_batch(self, sentence, epsilon, REPLACE=False, FILTER=False, STOP=False, POS=True, CONCAT=True):
+        tokens = nltk.word_tokenize(sentence)
+
+        if isinstance(epsilon, list):
+            word_eps = epsilon
+        else:
+            word_eps = [epsilon for i in range(len(tokens))]
+        new_tokens = [str(x) for x in tokens]
+
+        n = sentence_enum(tokens)
+        batch = [sentence for _ in range(len(tokens))]
+        res = self.privatize_batch(batch, tokens, n=n, ENGLISH=True, FILTER=FILTER, epsilon=word_eps, POS=POS, CONCAT=CONCAT)
+
+        replace = []
+        for i, r in enumerate(res):
+            if tokens[i][0].isupper() == True:
+                replace.append(res[r].capitalize())
+            else:
+                replace.append(res[r].lower())
+
+        return self.detokenizer.detokenize(replace)
     
     def dpmlm_rewrite_plus(self, sentence, epsilon, FILTER=False, TEMP=True, POS=True, CONCAT=True, ADD_PROB=0.15, DEL_PROB=0.05):
         if isinstance(sentence, list):
