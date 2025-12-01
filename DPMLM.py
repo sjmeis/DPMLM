@@ -415,7 +415,7 @@ class DPMLM():
         outputs = []
         masked_position = []
         split_size = np.ceil(len(sentences) / batch_size)
-        for batch, targets_batch, n_batch in zip(np.split(np.array(sentences), split_size), np.split(np.array(targets), split_size), np.split(np.array(n), split_size)):
+        for batch, targets_batch, n_batch in zip(np.array_split(np.array(sentences), split_size), np.array_split(np.array(targets), split_size), np.array_split(np.array(n), split_size)):
             split_sents = [nltk.word_tokenize(sentence) for sentence in batch]
             original_sents = [' '.join(split_sent) for split_sent in split_sents]
 
@@ -432,6 +432,7 @@ class DPMLM():
             if CONCAT == False:
                 inputs = self.tokenizer(
                     masked_sents,
+                    max_length=512,
                     return_tensors="pt",
                     padding=True,
                     truncation=True,
@@ -444,6 +445,7 @@ class DPMLM():
                 inputs = self.tokenizer(
                     text=original_sents,
                     text_pair=masked_sents,
+                    max_length=512,
                     return_tensors="pt",
                     padding=True,
                     truncation=True,
@@ -456,9 +458,10 @@ class DPMLM():
 
             #Get the predictions of the Masked LM transformer.
             with torch.no_grad():
-                outputs.append(self.lm_model(**inputs))
+                outputs.extend([self.lm_model(**inputs).logits])
                 
-        logits = torch.cat([x.logits for x in outputs])
+        #logits = torch.cat([x.logits for x in outputs])
+        logits = torch.cat(outputs)
         length, _, _ = logits.shape
 
         predictions = {}
@@ -529,7 +532,7 @@ class DPMLM():
 
         return self.detokenizer.detokenize(replace), perturbed, total
     
-    def dpmlm_rewrite_batch(self, sentence, epsilon, REPLACE=False, FILTER=False, STOP=False, POS=True, CONCAT=True):
+    def dpmlm_rewrite_batch(self, sentence, epsilon, REPLACE=False, FILTER=False, STOP=False, POS=True, CONCAT=True, batch_size=128):
         tokens = nltk.word_tokenize(sentence)
 
         if isinstance(epsilon, list):
@@ -540,7 +543,7 @@ class DPMLM():
 
         n = sentence_enum(tokens)
         batch = [sentence for _ in range(len(tokens))]
-        res = self.privatize_batch(batch, tokens, n=n, ENGLISH=True, FILTER=FILTER, epsilon=word_eps, POS=POS, CONCAT=CONCAT)
+        res = self.privatize_batch(batch, tokens, n=n, ENGLISH=True, FILTER=FILTER, epsilon=word_eps, POS=POS, CONCAT=CONCAT, batch_size=batch_size)
 
         replace = []
         for i, r in enumerate(res):
