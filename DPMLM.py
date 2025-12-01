@@ -413,6 +413,7 @@ class DPMLM():
     
     def privatize_batch(self, sentences, targets, n, epsilon, K=5, CONCAT=True, FILTER=True, POS=False, ENGLISH=False, MS=None, batch_size=128):
         outputs = []
+        masked_position = []
         split_size = np.ceil(len(sentences) / batch_size)
         for batch, targets_batch, n_batch in zip(np.split(np.array(sentences), split_size), np.split(np.array(targets), split_size), np.split(np.array(n), split_size)):
             split_sents = [nltk.word_tokenize(sentence) for sentence in batch]
@@ -451,26 +452,19 @@ class DPMLM():
 
             inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
-            masked_position = (inputs['input_ids'] == self.tokenizer.mask_token_id)
-
-            #original_output = self.raw_model(**inputs)
+            masked_position.extend((inputs['input_ids'] == self.tokenizer.mask_token_id).tolist())
 
             #Get the predictions of the Masked LM transformer.
             with torch.no_grad():
                 outputs.append(self.lm_model(**inputs))
                 
-        output = torch.cat(outputs)
-        
-        #logits = output[0].squeeze().detach().cpu().numpy()
-        logits = output.logits
+        logits = torch.cat([x.logits for x in outputs])
         length, _, _ = logits.shape
 
         predictions = {}
-        #for t, m, nn in zip(target, masked_position, n):
         for i in range(length):
             current = "{}_{}".format(targets[i], n[i])
 
-            #Get top guesses: their token IDs, scores, and words.
             mask_logits = logits[i][masked_position[i]].squeeze().detach().cpu().numpy()
             mask_logits = np.clip(mask_logits, self.clip_min, self.clip_max)
             mask_logits = mask_logits / (2 * self.sensitivity / epsilon[i])
