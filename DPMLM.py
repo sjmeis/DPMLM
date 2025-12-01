@@ -413,9 +413,8 @@ class DPMLM():
     
     def privatize_batch(self, sentences, targets, n, epsilon, K=5, CONCAT=True, FILTER=True, POS=False, ENGLISH=False, MS=None, batch_size=128):
         outputs = []
-        i = 0
-        for batch in np.split(np.array(sentences), np.ceil(len(sentences) / batch_size)):
-
+        split_size = np.ceil(len(sentences) / batch_size)
+        for batch, targets_batch, n_batch in zip(np.split(np.array(sentences), split_size), np.split(np.array(targets), split_size), np.split(np.array(n), split_size)):
             split_sents = [nltk.word_tokenize(sentence) for sentence in batch]
             original_sents = [' '.join(split_sent) for split_sent in split_sents]
 
@@ -425,12 +424,8 @@ class DPMLM():
             else:
                 masked_sents = MS
 
-            #for i, (t, nn) in enumerate(zip(targets, n)):
-            for _ in range(len(batch)):
-                t = targets[i]
-                nn = n[i]
+            for i, (t, nn) in enumerate(zip(targets_batch, n_batch)):
                 masked_sents[i] = nth_repl(masked_sents[i], t, self.tokenizer.mask_token, nn)
-                i += 1
 
             #Get the input token IDs of the input consisting of: the original sentence + separator + the masked sentence.
             if CONCAT == False:
