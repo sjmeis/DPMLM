@@ -412,51 +412,53 @@ class DPMLM():
         return predictions
     
     def privatize_batch(self, sentences, targets, n, epsilon, K=5, CONCAT=True, FILTER=True, POS=False, ENGLISH=False, MS=None, batch_size=128):
-        split_sents = [nltk.word_tokenize(sentence) for sentence in sentences]
-        original_sents = [' '.join(split_sent) for split_sent in split_sents]
-
-        # Masks the target word in the original sentence.
-        if MS is None:
-            masked_sents = [' '.join(split_sent) for split_sent in split_sents]
-        else:
-            masked_sents = MS
-
-        for i, (t, nn) in enumerate(zip(targets, n)):
-            masked_sents[i] = nth_repl(masked_sents[i], t, self.tokenizer.mask_token, nn)
-
-        #Get the input token IDs of the input consisting of: the original sentence + separator + the masked sentence.
-        if CONCAT == False:
-            inputs = self.tokenizer(
-                masked_sents,
-                return_tensors="pt",
-                padding=True,
-                truncation=True,
-                add_special_tokens=True
-            )
-        else:
-            original_sents = [" "+x.replace("MASK", "") for x in original_sents]
-            masked_sents = [" "+x for x in masked_sents]
-
-            inputs = self.tokenizer(
-                text=original_sents,
-                text_pair=masked_sents,
-                return_tensors="pt",
-                padding=True,
-                truncation=True,
-                add_special_tokens=True
-            )
-
-        inputs = {k: v.to(self.device) for k, v in inputs.items()}
-
-        masked_position = (inputs['input_ids'] == self.tokenizer.mask_token_id)
-
-        #original_output = self.raw_model(**inputs)
-
-        #Get the predictions of the Masked LM transformer.
         outputs = []
-        for batch in torch.split(inputs, split_size_or_sections=batch_size):
+        for batch in np.split(sentences, np.ceil(len(sentences) / batch_size)):
+
+            split_sents = [nltk.word_tokenize(sentence) for sentence in batch]
+            original_sents = [' '.join(split_sent) for split_sent in split_sents]
+
+            # Masks the target word in the original sentence.
+            if MS is None:
+                masked_sents = [' '.join(split_sent) for split_sent in split_sents]
+            else:
+                masked_sents = MS
+
+            for i, (t, nn) in enumerate(zip(targets, n)):
+                masked_sents[i] = nth_repl(masked_sents[i], t, self.tokenizer.mask_token, nn)
+
+            #Get the input token IDs of the input consisting of: the original sentence + separator + the masked sentence.
+            if CONCAT == False:
+                inputs = self.tokenizer(
+                    masked_sents,
+                    return_tensors="pt",
+                    padding=True,
+                    truncation=True,
+                    add_special_tokens=True
+                )
+            else:
+                original_sents = [" "+x.replace("MASK", "") for x in original_sents]
+                masked_sents = [" "+x for x in masked_sents]
+
+                inputs = self.tokenizer(
+                    text=original_sents,
+                    text_pair=masked_sents,
+                    return_tensors="pt",
+                    padding=True,
+                    truncation=True,
+                    add_special_tokens=True
+                )
+
+            inputs = {k: v.to(self.device) for k, v in inputs.items()}
+
+            masked_position = (inputs['input_ids'] == self.tokenizer.mask_token_id)
+
+            #original_output = self.raw_model(**inputs)
+
+            #Get the predictions of the Masked LM transformer.
             with torch.no_grad():
-                outputs.append(self.lm_model(**batch))
+                outputs.append(self.lm_model(**inputs))
+                
         output = torch.cat(outputs)
         
         #logits = output[0].squeeze().detach().cpu().numpy()
