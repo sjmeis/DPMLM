@@ -411,7 +411,7 @@ class DPMLM():
 
         return predictions
     
-    def privatize_batch(self, sentences, targets, n, epsilon, K=5, CONCAT=True, FILTER=True, POS=False, ENGLISH=False, MS=None):
+    def privatize_batch(self, sentences, targets, n, epsilon, K=5, CONCAT=True, FILTER=True, POS=False, ENGLISH=False, MS=None, batch_size=128):
         split_sents = [nltk.word_tokenize(sentence) for sentence in sentences]
         original_sents = [' '.join(split_sent) for split_sent in split_sents]
 
@@ -453,16 +453,19 @@ class DPMLM():
         #original_output = self.raw_model(**inputs)
 
         #Get the predictions of the Masked LM transformer.
-        with torch.no_grad():
-            output = self.lm_model(**inputs)
+        outputs = []
+        for batch in torch.split(inputs, split_size_or_sections=batch_size):
+            with torch.no_grad():
+                outputs.append(self.lm_model(**batch))
+        output = torch.cat(outputs)
         
         #logits = output[0].squeeze().detach().cpu().numpy()
         logits = output.logits
-        batch_size, _, _ = logits.shape
+        length, _, _ = logits.shape
 
         predictions = {}
         #for t, m, nn in zip(target, masked_position, n):
-        for i in range(batch_size):
+        for i in range(length):
             current = "{}_{}".format(targets[i], n[i])
 
             #Get top guesses: their token IDs, scores, and words.
