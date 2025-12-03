@@ -411,11 +411,28 @@ class DPMLM():
 
         return predictions
     
-    def privatize_batch(self, sentences, targets, n, epsilon, K=5, CONCAT=True, FILTER=True, POS=False, ENGLISH=False, MS=None, batch_size=128):
+    def privatize_batch(self, sentences, targets, n, epsilon, K=5, CONCAT=True, FILTER=True, POS=False, ENGLISH=False, MS=None, batch_size=16):
         outputs = []
         masked_position = []
-        split_size = np.ceil(len(sentences) / batch_size)
-        for batch, targets_batch, n_batch in zip(np.array_split(np.array(sentences), split_size), np.array_split(np.array(targets), split_size), np.array_split(np.array(n), split_size)):
+        split_size = int(np.ceil(len(sentences) / batch_size))
+
+        begin = 0
+        end = batch_size
+        for idx in range(split_size):
+            if end is not None:
+                batch = sentences[begin:end]
+                targets_batch = targets[begin:end]
+                n_batch = n[begin:end]
+            else:
+                batch = sentences[begin:]
+                targets_batch = targets[begin:]
+                n_batch = n[begin:]
+
+            begin += batch_size
+            if idx == split_size - 2 or idx == split_size - 1:
+                end = None
+            else:
+                end += batch_size
             split_sents = [nltk.word_tokenize(sentence) for sentence in batch]
             original_sents = [' '.join(split_sent) for split_sent in split_sents]
 
@@ -532,7 +549,7 @@ class DPMLM():
 
         return self.detokenizer.detokenize(replace), perturbed, total
     
-    def dpmlm_rewrite_batch(self, sentence, epsilon, REPLACE=False, FILTER=False, STOP=False, POS=True, CONCAT=True, batch_size=128):
+    def dpmlm_rewrite_batch(self, sentence, epsilon, REPLACE=False, FILTER=False, STOP=False, POS=True, CONCAT=True, batch_size=16):
         tokens = nltk.word_tokenize(sentence)
 
         if isinstance(epsilon, list):
