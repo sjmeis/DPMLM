@@ -17,6 +17,7 @@ from nltk.corpus import stopwords
 from nltk.stem.wordnet import WordNetLemmatizer
 from transformers import AutoModel, AutoTokenizer, AutoModelForMaskedLM, logging
 import importlib_resources as impresources
+import gc
 
 en = wn.Wordnet('oewn:2022') 
 
@@ -476,6 +477,8 @@ class DPMLM():
             #Get the predictions of the Masked LM transformer.
             with torch.no_grad():
                 outputs.extend(self.lm_model(**inputs).logits)
+
+            del inputs
                 
         #logits = torch.cat([x.logits for x in outputs])
         # logits = torch.cat(outputs)
@@ -497,6 +500,11 @@ class DPMLM():
 
         for p in predictions:
             predictions[p] = predictions[p][0]
+
+        del outputs
+        with torch.no_grad():
+            torch.cuda.empty_cache()
+        gc.collect()
 
         return predictions
     
