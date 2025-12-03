@@ -475,17 +475,17 @@ class DPMLM():
 
             #Get the predictions of the Masked LM transformer.
             with torch.no_grad():
-                outputs.extend([self.lm_model(**inputs).logits])
+                outputs.extend(self.lm_model(**inputs).logits)
                 
         #logits = torch.cat([x.logits for x in outputs])
-        logits = torch.cat(outputs)
-        length, _, _ = logits.shape
+        # logits = torch.cat(outputs)
+        # length, _, _ = logits.shape
 
         predictions = {}
-        for i in range(length):
+        for i in range(len(outputs)):
             current = "{}_{}".format(targets[i], n[i])
 
-            mask_logits = logits[i][masked_position[i]].squeeze().detach().cpu().numpy()
+            mask_logits = outputs[i][masked_position[i]].squeeze().detach().cpu().numpy()
             mask_logits = np.clip(mask_logits, self.clip_min, self.clip_max)
             mask_logits = mask_logits / (2 * self.sensitivity / epsilon[i])
 
