@@ -19,6 +19,8 @@ from transformers import AutoModel, AutoTokenizer, AutoModelForMaskedLM, logging
 import importlib_resources as impresources
 import gc
 
+torch.set_float32_matmul_precision('medium')
+
 en = wn.Wordnet('oewn:2022') 
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
@@ -486,7 +488,10 @@ class DPMLM():
                 outputs.extend(self.lm_model(**inputs).logits)
 
             del inputs
-                
+            with torch.no_grad():
+                torch.cuda.empty_cache()
+            gc.collect()
+                    
         predictions = {}
         for i in range(len(outputs)):
             current = "{}_{}".format(targets[i], n[i])
