@@ -356,10 +356,11 @@ class DPMLM():
             #Get top guesses: their token IDs, scores, and words.
             mask_logits = logits[m].squeeze()
             if TEMP == True:
+                mask_logits = mask_logits[:self.max_idx+1]
                 mask_logits = np.clip(mask_logits, self.clip_min, self.clip_max)
                 mask_logits = mask_logits / (2 * self.sensitivity / epsilon)
 
-                logits_idx = [i for i, x in enumerate(mask_logits) if i <= self.max_idx]
+                logits_idx = [i for i, x in enumerate(mask_logits)]
                 scores = torch.softmax(torch.from_numpy(mask_logits), dim=0)
                 scores = scores / scores.sum()
                 chosen_idx = np.random.choice(logits_idx, p=scores.numpy())
@@ -494,11 +495,12 @@ class DPMLM():
             if len(mask_logits) == 0:
                 predictions[current] = (targets[i], 0)
                 continue
+            mask_logits = mask_logits[:self.max_idx+1]
             mask_logits = np.clip(mask_logits, self.clip_min, self.clip_max)
             mask_logits = mask_logits / (2 * self.sensitivity / epsilon[i])
 
-            logits_idx = [j for j, x in enumerate(mask_logits) if j <= self.max_idx]
-            scores = torch.softmax(torch.from_numpy(mask_logits[:self.max_idx+1]), dim=0)
+            logits_idx = [j for j, x in enumerate(mask_logits)]
+            scores = torch.softmax(torch.from_numpy(mask_logits), dim=0)
             scores = scores / scores.sum()
             chosen_idx = np.random.choice(logits_idx, p=scores.numpy())
             predictions[current] = (self.tokenizer.decode(chosen_idx).strip(), scores[chosen_idx])
