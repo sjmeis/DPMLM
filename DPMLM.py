@@ -488,9 +488,6 @@ class DPMLM():
                 outputs.extend(self.lm_model(**inputs).logits)
 
             del inputs
-            with torch.no_grad():
-                torch.cuda.empty_cache()
-            gc.collect()
                     
         predictions = {}
         for i in range(len(outputs)):
