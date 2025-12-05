@@ -272,14 +272,20 @@ class DPMLM():
     nlp = None
     alpha = None
 
-    def __init__(self, MODEL="roberta-base", SPACY="en_core_web_md", alpha=0.003):
+    def __init__(self, MODEL="answerdotai/ModernBERT-base", SPACY="en_core_web_md", alpha=0.003):
         self.tokenizer = AutoTokenizer.from_pretrained(MODEL)
         self.lm_model = AutoModelForMaskedLM.from_pretrained(MODEL)
         self.raw_model = AutoModel.from_pretrained(MODEL, output_hidden_states=True, output_attentions=True)
         self.alpha = alpha
 
-        self.clip_min = -3.2093127
-        self.clip_max = 16.304797887802124
+        # old for roberta-base
+        # self.clip_min = -3.2093127
+        # self.clip_max = 16.304797887802124
+
+        # new for ModernBert
+        self.clip_min = -1.207156
+        self.clip_max = 14.831477403640747
+
         self.sensitivity = abs(self.clip_max - self.clip_min)
 
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
