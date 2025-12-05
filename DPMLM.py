@@ -272,7 +272,7 @@ class DPMLM():
     nlp = None
     alpha = None
 
-    def __init__(self, MODEL="answerdotai/ModernBERT-base", SPACY="en_core_web_md", alpha=0.003):
+    def __init__(self, MODEL="answerdotai/ModernBERT-base", SPACY="en_core_web_md", alpha=0.003, max_idx=50280):
         self.tokenizer = AutoTokenizer.from_pretrained(MODEL)
         self.lm_model = AutoModelForMaskedLM.from_pretrained(MODEL)
         self.raw_model = AutoModel.from_pretrained(MODEL, output_hidden_states=True, output_attentions=True)
@@ -285,6 +285,7 @@ class DPMLM():
         # new for ModernBert
         self.clip_min = -1.207156
         self.clip_max = 14.831477403640747
+        self.max_idx = max_idx
 
         self.sensitivity = abs(self.clip_max - self.clip_min)
 
@@ -358,7 +359,7 @@ class DPMLM():
                 mask_logits = np.clip(mask_logits, self.clip_min, self.clip_max)
                 mask_logits = mask_logits / (2 * self.sensitivity / epsilon)
 
-                logits_idx = [i for i, x in enumerate(mask_logits)]
+                logits_idx = [i for i, x in enumerate(mask_logits) if i <= self.max_idx]
                 scores = torch.softmax(torch.from_numpy(mask_logits), dim=0)
                 scores = scores / scores.sum()
                 chosen_idx = np.random.choice(logits_idx, p=scores.numpy())
@@ -375,7 +376,6 @@ class DPMLM():
             if len(words) == 0:
                 predictions[current] = [(t, 1)]
                 continue
-
 
             assert len(words) == len(scores)
 
@@ -456,7 +456,7 @@ class DPMLM():
             if CONCAT == False:
                 inputs = self.tokenizer(
                     masked_sents,
-                    max_length=512,
+                    max_length=1024,
                     return_tensors="pt",
                     padding=True,
                     truncation=True,
@@ -469,7 +469,7 @@ class DPMLM():
                 inputs = self.tokenizer(
                     text=original_sents,
                     text_pair=masked_sents,
-                    max_length=512,
+                    max_length=1024,
                     return_tensors="pt",
                     padding=True,
                     truncation=True,
@@ -486,10 +486,6 @@ class DPMLM():
 
             del inputs
                 
-        #logits = torch.cat([x.logits for x in outputs])
-        # logits = torch.cat(outputs)
-        # length, _, _ = logits.shape
-
         predictions = {}
         for i in range(len(outputs)):
             current = "{}_{}".format(targets[i], n[i])
@@ -501,7 +497,7 @@ class DPMLM():
             mask_logits = np.clip(mask_logits, self.clip_min, self.clip_max)
             mask_logits = mask_logits / (2 * self.sensitivity / epsilon[i])
 
-            logits_idx = [j for j, x in enumerate(mask_logits)]
+            logits_idx = [j for j, x in enumerate(mask_logits) if j <= self.max_idx]
             scores = torch.softmax(torch.from_numpy(mask_logits), dim=0)
             scores = scores / scores.sum()
             chosen_idx = np.random.choice(logits_idx, p=scores.numpy())
@@ -526,7 +522,7 @@ class DPMLM():
         if isinstance(epsilon, list):
             word_eps = epsilon
         else:
-            word_eps = [epsilon for _ in range(len(tokens))] #epsilon #/ num_tokens
+            word_eps = [epsilon for _ in range(len(tokens))]
         n = sentence_enum(tokens)
         replace = []
         new_tokens = [str(x) for x in tokens]
