@@ -311,7 +311,7 @@ class DPMLM():
         
         return final_score, prop_score, substitute_validation
 
-    def privatize(self, sentence, target, n=1, K=5, CONCAT=True, FILTER=True, POS=False, ENGLISH=False, epsilon=1, MS=None, TEMP=False):
+    def privatize(self, sentence, target, n, start_index, K=5, CONCAT=True, FILTER=True, POS=False, ENGLISH=False, epsilon=1, TEMP=False):
         #encoded = self.tokenizer.encode(sentence, add_special_tokens=False)
         #split_sent = [x.strip() for x in self.tokenizer.batch_decode(encoded, skip_special_tokens=True) if x != ""]
         split_sent = nltk.word_tokenize(sentence)
@@ -320,20 +320,21 @@ class DPMLM():
         #orig_pos = [x.tag_ for x in self.nlp(original_sent)]
 
         # Masks the target word in the original sentence.
-        if MS is None:
-            masked_sent = ' '.join(split_sent) # self.tokenizer.decode(encoded, skip_special_tokens=True)
-        else:
-            masked_sent = MS
+        masked_sent = ' '.join(split_sent) # self.tokenizer.decode(encoded, skip_special_tokens=True)
 
-        if isinstance(target, list):
-            if n == 1:
-                n = [1 for _ in range(len(target))]
+        # if isinstance(target, list):
+        #     if n == 1:
+        #         n = [1 for _ in range(len(target))]
 
-            for t, nn in zip(target, n):
-                masked_sent = nth_repl(masked_sent, t, self.tokenizer.mask_token, nn)
-        else:
-            masked_sent = nth_repl(masked_sent, target, self.tokenizer.mask_token, n)
-            n = [n]
+        #     for t, nn in zip(target, n):
+        #         masked_sent = nth_repl(masked_sent, t, self.tokenizer.mask_token, nn)
+        #else:
+        masked_sent = nth_repl(masked_sent, target, self.tokenizer.mask_token, n)
+        n = [n]
+
+        encoded = self.tokenizer.encode(masked_sent, add_special_tokens=False)
+        lower, upper = self.sliding_window(encoded, start_index, int((self.tokenizer.model_max_length-32)/2))
+        masked_sent = self.tokenizer.decode(encoded[lower:upper], skip_special_tokens=False)
 
         #Get the input token IDs of the input consisting of: the original sentence + separator + the masked sentence.
         if CONCAT == False:
@@ -568,9 +569,7 @@ class DPMLM():
                 r = res[t+"_{}".format(new_n[i])]
                 new_tokens[i] = r
             else:
-                lower, upper = self.sliding_window(encoded, i, int((self.tokenizer.model_max_length-32)/2))
-                t_sentence = self.tokenizer.decode(encoded[lower:upper], skip_special_tokens=True)
-                res = self.privatize(t_sentence, t, n=nn, ENGLISH=True, FILTER=FILTER, epsilon=eps, TEMP=TEMP, POS=POS, CONCAT=CONCAT)
+                res = self.privatize(sentence, t, nn, i, ENGLISH=True, FILTER=FILTER, epsilon=eps, TEMP=TEMP, POS=POS, CONCAT=CONCAT)
                 r = res[t+"_{}".format(nn)]
 
             if tokens[i][0].isupper() == True:
