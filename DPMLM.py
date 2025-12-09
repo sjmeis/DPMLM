@@ -260,7 +260,6 @@ class DPMLM():
 
             del inputs
                     
-        #predictions = {}
         for i in range(len(outputs)):
             current = "{}_{}".format(targets[i], n[i])
 
@@ -275,10 +274,7 @@ class DPMLM():
             scores = torch.softmax(torch.from_numpy(mask_logits), dim=0)
             scores = scores / scores.sum()
             chosen_idx = np.random.choice(logits_idx, p=scores.numpy())
-            predictions[current] = self.tokenizer.decode(chosen_idx).strip() #(self.tokenizer.decode(chosen_idx).strip(), scores[chosen_idx])
-
-        # for p in predictions:
-        #     predictions[p] = predictions[p][0]
+            predictions[current] = self.tokenizer.decode(chosen_idx).strip()
 
         del outputs
         with torch.no_grad():
@@ -358,13 +354,10 @@ class DPMLM():
         n_final = n.copy()
         batch = []
         for i in range(len(tokens)):
-            # lower, upper = self.sliding_window(tokens, i, int((self.tokenizer.model_max_length-32)/2))
-            # batch.append(self.tokenizer.decode(encoded[lower:upper], skip_special_tokens=True))
             batch.append(sentence)
         res = self.privatize_batch(batch, tokens, n=n, epsilon=word_eps, CONCAT=CONCAT, STOP=STOP, batch_size=batch_size)
 
         replace = []
-        #for i, r in enumerate(res):
         for i, (t, x) in enumerate(zip(tokens_final, n_final)):
             r = "{}_{}".format(t, x)
             if tokens[i][0].isupper() == True:
@@ -383,7 +376,7 @@ class DPMLM():
         if isinstance(epsilon, list):
             word_eps = epsilon
         else:
-            word_eps = [epsilon for _ in range(len(tokens))] #epsilon #/ num_tokens
+            word_eps = [epsilon for _ in range(len(tokens))] # epsilon / num_tokens
         n = sentence_enum(tokens)
         replace = []
         new_tokens = [str(x) for x in tokens]
