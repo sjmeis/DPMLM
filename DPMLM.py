@@ -28,7 +28,7 @@ logging.set_verbosity_warning()
 
 stop = set([x for x in stopwords.words("english")])
 
-def nth_repl(self, s, sub, repl, n):
+def nth_repl(s, sub, repl, n):
     s_split = nltk.word_tokenize(s) #[x.strip() for x in self.tokenizer.batch_decode(self.tokenizer.encode(s, add_special_tokens=False), skip_special_tokens=True) if x != ""]
     i = 0
     try:
@@ -337,9 +337,9 @@ class DPMLM():
 
         #Get the input token IDs of the input consisting of: the original sentence + separator + the masked sentence.
         if CONCAT == False:
-            input_ids = self.tokenizer.encode(" "+masked_sent, add_special_tokens=True)
+            input_ids = self.tokenizer.encode(" "+masked_sent, add_special_tokens=True, truncation=True)
         else:
-            input_ids = self.tokenizer.encode(" "+original_sent.replace("MASK", ""), " "+masked_sent, add_special_tokens=True)
+            input_ids = self.tokenizer.encode(" "+original_sent.replace("MASK", ""), " "+masked_sent, add_special_tokens=True, truncation="only_first")
         if isinstance(target, list):
             masked_position = np.where(np.array(input_ids) == self.tokenizer.mask_token_id)[0].tolist()
         else:
@@ -463,7 +463,7 @@ class DPMLM():
             if CONCAT == False:
                 inputs = self.tokenizer(
                     masked_sents,
-                    max_length=self.tokenizer.model_max_length-16,
+                    max_length=self.tokenizer.model_max_length-32,
                     return_tensors="pt",
                     padding=True,
                     truncation=True,
@@ -476,10 +476,10 @@ class DPMLM():
                 inputs = self.tokenizer(
                     text=original_sents,
                     text_pair=masked_sents,
-                    max_length=self.tokenizer.model_max_length-16,
+                    max_length=self.tokenizer.model_max_length-32,
                     return_tensors="pt",
                     padding=True,
-                    truncation=True,
+                    truncation="only_first",
                     add_special_tokens=True
                 )
 
@@ -560,7 +560,7 @@ class DPMLM():
                 continue
 
             if REPLACE == True:
-                lower, upper = self.sliding_window(new_tokens, i, int((self.tokenizer.model_max_length-16)/2))
+                lower, upper = self.sliding_window(new_tokens, i, int((self.tokenizer.model_max_length-32)/2))
                 new_s = " ".join(new_tokens[lower:upper])
                 new_n = sentence_enum(new_tokens[lower:upper])
                 t_sentence = self.tokenizer.decode(encoded[lower:upper], skip_special_tokens=True)
@@ -568,7 +568,7 @@ class DPMLM():
                 r = res[t+"_{}".format(new_n[i])]
                 new_tokens[i] = r
             else:
-                lower, upper = self.sliding_window(encoded, i, int((self.tokenizer.model_max_length-16)/2))
+                lower, upper = self.sliding_window(encoded, i, int((self.tokenizer.model_max_length-32)/2))
                 t_sentence = self.tokenizer.decode(encoded[lower:upper], skip_special_tokens=True)
                 res = self.privatize(t_sentence, t, n=nn, ENGLISH=True, FILTER=FILTER, epsilon=eps, TEMP=TEMP, POS=POS, CONCAT=CONCAT)
                 r = res[t+"_{}".format(nn)]
@@ -597,7 +597,7 @@ class DPMLM():
         n = sentence_enum(tokens)
         batch = []
         for i in range(len(tokens)):
-            lower, upper = self.sliding_window(tokens, i, int((self.tokenizer.model_max_length-16)/2))
+            lower, upper = self.sliding_window(tokens, i, int((self.tokenizer.model_max_length-32)/2))
             batch.append(self.tokenizer.decode(encoded[lower:upper], skip_special_tokens=True))
 
         res = self.privatize_batch(batch, tokens, n=n, ENGLISH=True, FILTER=FILTER, epsilon=word_eps, POS=POS, CONCAT=CONCAT, batch_size=batch_size)
