@@ -342,7 +342,7 @@ class DPMLM():
     def dpmlm_rewrite_batch(self, sentence, epsilon, REPLACE=False, STOP=False, CONCAT=True, batch_size=16):
         sentence = " ".join(sentence.split("\n"))
         tokens = nltk.word_tokenize(sentence)
-        encoded = self.tokenizer.encode(sentence, add_special_tokens=False)
+        tokens_final = tokens.copy()
 
         if isinstance(epsilon, list):
             word_eps = epsilon
@@ -350,6 +350,7 @@ class DPMLM():
             word_eps = [epsilon for _ in range(len(tokens))]
 
         n = sentence_enum(tokens)
+        n_final = n.copy()
         batch = []
         for i in range(len(tokens)):
             # lower, upper = self.sliding_window(tokens, i, int((self.tokenizer.model_max_length-32)/2))
@@ -359,7 +360,7 @@ class DPMLM():
 
         replace = []
         #for i, r in enumerate(res):
-        for i, (t, x) in enumerate(zip(tokens, n)):
+        for i, (t, x) in enumerate(zip(tokens_final, n_final)):
             r = "{}_{}".format(t, x)
             if tokens[i][0].isupper() == True:
                 replace.append(res[r].capitalize())
