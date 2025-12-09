@@ -568,7 +568,7 @@ class DPMLM():
             else:
                 lower, upper = self.sliding_window(tokens, i, self.tokenizer.model_max_length)
                 t_sentence = self.tokenizer.decode(encoded[lower:upper], skip_special_tokens=True)
-                res = self.privatize(sentence, t, n=nn, ENGLISH=True, FILTER=FILTER, epsilon=eps, TEMP=TEMP, POS=POS, CONCAT=CONCAT)
+                res = self.privatize(t_sentence, t, n=nn, ENGLISH=True, FILTER=FILTER, epsilon=eps, TEMP=TEMP, POS=POS, CONCAT=CONCAT)
                 r = res[t+"_{}".format(nn)]
 
             if tokens[i][0].isupper() == True:
