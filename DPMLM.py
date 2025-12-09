@@ -532,10 +532,10 @@ class DPMLM():
         if isinstance(sentence, list):
             tokens = sentence
         else:
-            #tokens = nltk.word_tokenize(sentence)
             sentence = " ".join(sentence.split("\n"))
+            tokens = nltk.word_tokenize(sentence)
             encoded = self.tokenizer.encode(sentence, add_special_tokens=False)
-            tokens = [x.strip() for x in self.tokenizer.batch_decode(encoded, skip_special_tokens=True) if x != ""]
+            #tokens = [x.strip() for x in self.tokenizer.batch_decode(encoded, skip_special_tokens=True) if x != ""]
 
         if isinstance(epsilon, list):
             word_eps = epsilon
