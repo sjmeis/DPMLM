@@ -558,7 +558,7 @@ class DPMLM():
                 continue
 
             if REPLACE == True:
-                lower, upper = self.sliding_window(new_tokens, i, self.tokenizer.model_max_length)
+                lower, upper = self.sliding_window(new_tokens, i, int(self.tokenizer.model_max_length/2))
                 new_s = " ".join(new_tokens[lower:upper])
                 new_n = sentence_enum(new_tokens[lower:upper])
                 t_sentence = self.tokenizer.decode(encoded[lower:upper], skip_special_tokens=True)
@@ -566,7 +566,7 @@ class DPMLM():
                 r = res[t+"_{}".format(new_n[i])]
                 new_tokens[i] = r
             else:
-                lower, upper = self.sliding_window(tokens, i, self.tokenizer.model_max_length)
+                lower, upper = self.sliding_window(tokens, i, int(self.tokenizer.model_max_length/2))
                 t_sentence = self.tokenizer.decode(encoded[lower:upper], skip_special_tokens=True)
                 res = self.privatize(t_sentence, t, n=nn, ENGLISH=True, FILTER=FILTER, epsilon=eps, TEMP=TEMP, POS=POS, CONCAT=CONCAT)
                 r = res[t+"_{}".format(nn)]
@@ -594,7 +594,7 @@ class DPMLM():
         n = sentence_enum(tokens)
         batch = []
         for i in range(len(tokens)):
-            lower, upper = self.sliding_window(tokens, i, self.tokenizer.model_max_length)
+            lower, upper = self.sliding_window(tokens, i, int(self.tokenizer.model_max_length/2))
             batch.append(self.tokenizer.decode(encoded[lower:upper], skip_special_tokens=True))
 
         res = self.privatize_batch(batch, tokens, n=n, ENGLISH=True, FILTER=FILTER, epsilon=word_eps, POS=POS, CONCAT=CONCAT, batch_size=batch_size)
