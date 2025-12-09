@@ -312,8 +312,8 @@ class DPMLM():
         return final_score, prop_score, substitute_validation
 
     def privatize(self, sentence, target, n=1, K=5, CONCAT=True, FILTER=True, POS=False, ENGLISH=False, epsilon=1, MS=None, TEMP=False):
-        encoded = self.tokenizer.encode(sentence)
-        split_sent = [x.strip() for x in self.tokenizer.batch_decode(encoded) if x != ""]
+        encoded = self.tokenizer.encode(sentence, add_special_tokens=False)
+        split_sent = [x.strip() for x in self.tokenizer.batch_decode(encoded, skip_special_tokens=True) if x != ""]
         #split_sent = nltk.word_tokenize(sentence)
         original_sent = ' '.join(split_sent)
         #orig_pos = [x.tag_ for x in self.nlp(original_sent)]
@@ -532,8 +532,8 @@ class DPMLM():
             tokens = sentence
         else:
             #tokens = nltk.word_tokenize(sentence)
-            encoded = self.tokenizer.encode(sentence)
-            tokens = [x.strip() for x in self.tokenizer.batch_decode(encoded) if x != ""]
+            encoded = self.tokenizer.encode(sentence, add_special_tokens=False)
+            tokens = [x.strip() for x in self.tokenizer.batch_decode(encoded, skip_special_tokens=True) if x != ""]
 
         if isinstance(epsilon, list):
             word_eps = epsilon
@@ -566,7 +566,7 @@ class DPMLM():
                 r = res[t+"_{}".format(new_n[i])]
                 new_tokens[i] = r
             else:
-                lower, upper = self.sliding_window(tokens, i, int(self.tokenizer.model_max_length/2))
+                lower, upper = self.sliding_window(encoded, i, int(self.tokenizer.model_max_length/2))
                 t_sentence = self.tokenizer.decode(encoded[lower:upper], skip_special_tokens=True)
                 res = self.privatize(t_sentence, t, n=nn, ENGLISH=True, FILTER=FILTER, epsilon=eps, TEMP=TEMP, POS=POS, CONCAT=CONCAT)
                 r = res[t+"_{}".format(nn)]
@@ -583,8 +583,8 @@ class DPMLM():
         return self.detokenizer.detokenize(replace), perturbed, total
     
     def dpmlm_rewrite_batch(self, sentence, epsilon, REPLACE=False, FILTER=False, STOP=False, POS=True, CONCAT=True, batch_size=16):
-        encoded = self.tokenizer.encode(sentence)
-        tokens = [x for x in self.tokenizer.batch_decode(encoded) if x != ""]
+        encoded = self.tokenizer.encode(sentence, add_special_tokens=False)
+        tokens = [x for x in self.tokenizer.batch_decode(encoded, skip_special_tokens=True) if x != ""]
 
         if isinstance(epsilon, list):
             word_eps = epsilon
