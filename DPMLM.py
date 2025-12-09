@@ -175,16 +175,21 @@ class DPMLM():
         new_sentences = []
         new_targets = []
         new_n = []
-        for t, s, x in zip(targets, sentences, n):
+        new_epsilon = []
+        target_indices = []
+        for i, (t, s, x, e) in enumerate(zip(targets, sentences, n, epsilon)):
             if (STOP == False and t in stop) or t in string.punctuation:
                 predictions["{}_{}".format(t, x)] = t
                 continue
             new_sentences.append(s)
             new_targets.append(t)
             new_n.append(x)
-        sentences = new_sentences
-        targets = new_targets
-        n = new_n
+            new_epsilon.append(e)
+            target_indices.append(i)
+        sentences = new_sentences.copy()
+        targets = new_targets.copy()
+        n = new_n.copy()
+        epsilon = new_epsilon.copy()
 
         split_size = int(np.ceil(len(sentences) / batch_size))
 
@@ -216,7 +221,7 @@ class DPMLM():
             for i, (t, nn) in enumerate(zip(targets_batch, n_batch)):
                 temp = nth_repl(masked_sents[i], t, self.tokenizer.mask_token, nn)
                 encoded = self.tokenizer.encode(temp, add_special_tokens=False)
-                lower, upper = self.sliding_window(encoded, start_index, int((self.tokenizer.model_max_length-32)/2))
+                lower, upper = self.sliding_window(encoded, target_indices[start_index], int((self.tokenizer.model_max_length-32)/2))
                 masked_sent = self.tokenizer.decode(encoded[lower:upper], skip_special_tokens=False)
                 masked_sents[i] = masked_sent
                 start_index += 1
