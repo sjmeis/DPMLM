@@ -123,7 +123,7 @@ class DPMLM():
         original_sent = ' '.join(split_sent)
 
         # Masks the target word in the original sentence.
-        masked_sent = ' '.join(split_sent) # self.tokenizer.decode(encoded, skip_special_tokens=True)
+        masked_sent = ' '.join(split_sent)
         masked_sent = nth_repl(masked_sent, target, self.tokenizer.mask_token, n)
         n = [n]
 
@@ -167,11 +167,28 @@ class DPMLM():
 
         return predictions
     
-    def privatize_batch(self, sentences, targets, n, epsilon, K=5, CONCAT=True, FILTER=True, POS=False, ENGLISH=False, MS=None, batch_size=16):
+    def privatize_batch(self, sentences, targets, n, epsilon, CONCAT=True, STOP=False, batch_size=16):
+        predictions = {}
         outputs = []
         masked_position = []
+
+        new_sentences = []
+        new_targets = []
+        new_n = []
+        for t, s, x in zip(targets, sentences, n):
+            if (STOP == False and t in stop) or t in string.punctuation:
+                predictions["{}_{}".format(t, x)] = t
+                continue
+            new_sentences.append(s)
+            new_targets.append(t)
+            new_n.append(x)
+        sentences = new_sentences
+        targets = new_targets
+        n = new_n
+
         split_size = int(np.ceil(len(sentences) / batch_size))
 
+        start_index = 0
         begin = 0
         end = batch_size
         for idx in range(split_size):
@@ -190,17 +207,19 @@ class DPMLM():
             else:
                 end += batch_size
 
-            split_sents = [[x for x in self.tokenizer.batch_decode(self.tokenizer.encode(sentence)) if x != ""] for sentence in batch]
+            split_sents = [nltk.word_tokenize(sentence) for sentence in batch]
             original_sents = [' '.join(split_sent) for split_sent in split_sents]
 
             # Masks the target word in the original sentence.
-            if MS is None:
-                masked_sents = [' '.join(split_sent) for split_sent in split_sents]
-            else:
-                masked_sents = MS
+            masked_sents = [' '.join(split_sent) for split_sent in split_sents]
 
             for i, (t, nn) in enumerate(zip(targets_batch, n_batch)):
-                masked_sents[i] = nth_repl(masked_sents[i], t, self.tokenizer.mask_token, nn)
+                temp = nth_repl(masked_sents[i], t, self.tokenizer.mask_token, nn)
+                encoded = self.tokenizer.encode(temp, add_special_tokens=False)
+                lower, upper = self.sliding_window(encoded, start_index, int((self.tokenizer.model_max_length-32)/2))
+                masked_sent = self.tokenizer.decode(encoded[lower:upper], skip_special_tokens=False)
+                masked_sents[i] = masked_sent
+                start_index += 1
 
             #Get the input token IDs of the input consisting of: the original sentence + separator + the masked sentence.
             if CONCAT == False:
@@ -236,7 +255,7 @@ class DPMLM():
 
             del inputs
                     
-        predictions = {}
+        #predictions = {}
         for i in range(len(outputs)):
             current = "{}_{}".format(targets[i], n[i])
 
@@ -244,7 +263,6 @@ class DPMLM():
             if len(mask_logits) == 0:
                 predictions[current] = (targets[i], 0)
                 continue
-            #mask_logits = mask_logits[:self.max_idx+1]
             mask_logits = np.clip(mask_logits, self.clip_min, self.clip_max)
             mask_logits = mask_logits / (2 * self.sensitivity / epsilon[i])
 
@@ -272,13 +290,9 @@ class DPMLM():
         return lower, upper
 
     def dpmlm_rewrite(self, sentence, epsilon, REPLACE=False, STOP=False, CONCAT=True):
-        if isinstance(sentence, list):
-            tokens = sentence
-        else:
-            sentence = " ".join(sentence.split("\n"))
-            tokens = nltk.word_tokenize(sentence)
-            encoded = self.tokenizer.encode(sentence, add_special_tokens=False)
-            #tokens = [x.strip() for x in self.tokenizer.batch_decode(encoded, skip_special_tokens=True) if x != ""]
+        sentence = " ".join(sentence.split("\n"))
+        tokens = nltk.word_tokenize(sentence)
+        encoded = self.tokenizer.encode(sentence, add_special_tokens=False)
 
         if isinstance(epsilon, list):
             word_eps = epsilon
@@ -327,8 +341,8 @@ class DPMLM():
     
     def dpmlm_rewrite_batch(self, sentence, epsilon, REPLACE=False, STOP=False, CONCAT=True, batch_size=16):
         sentence = " ".join(sentence.split("\n"))
+        tokens = nltk.word_tokenize(sentence)
         encoded = self.tokenizer.encode(sentence, add_special_tokens=False)
-        tokens = [x for x in self.tokenizer.batch_decode(encoded, skip_special_tokens=True) if x != ""]
 
         if isinstance(epsilon, list):
             word_eps = epsilon
@@ -338,13 +352,15 @@ class DPMLM():
         n = sentence_enum(tokens)
         batch = []
         for i in range(len(tokens)):
-            lower, upper = self.sliding_window(tokens, i, int((self.tokenizer.model_max_length-32)/2))
-            batch.append(self.tokenizer.decode(encoded[lower:upper], skip_special_tokens=True))
-
-        res = self.privatize_batch(batch, tokens, n=n, epsilon=word_eps, CONCAT=CONCAT, batch_size=batch_size)
+            # lower, upper = self.sliding_window(tokens, i, int((self.tokenizer.model_max_length-32)/2))
+            # batch.append(self.tokenizer.decode(encoded[lower:upper], skip_special_tokens=True))
+            batch.append(sentence)
+        res = self.privatize_batch(batch, tokens, n=n, epsilon=word_eps, CONCAT=CONCAT, STOP=STOP, batch_size=batch_size)
 
         replace = []
-        for i, r in enumerate(res):
+        #for i, r in enumerate(res):
+        for i, (t, x) in enumerate(zip(tokens, n)):
+            r = "{}_{}".format(t, x)
             if tokens[i][0].isupper() == True:
                 replace.append(res[r].capitalize())
             else:
