@@ -274,20 +274,20 @@ class DPMLM():
     nlp = None
     alpha = None
 
-    def __init__(self, MODEL="answerdotai/ModernBERT-base", SPACY="en_core_web_md", alpha=0.003, max_idx=50280):
+    def __init__(self, MODEL="FacebookAI/roberta-base", SPACY="en_core_web_md", alpha=0.003):
         self.tokenizer = AutoTokenizer.from_pretrained(MODEL)
         self.lm_model = AutoModelForMaskedLM.from_pretrained(MODEL)
         self.raw_model = AutoModel.from_pretrained(MODEL, output_hidden_states=True, output_attentions=True)
         self.alpha = alpha
 
         # old for roberta-base
-        # self.clip_min = -3.2093127
-        # self.clip_max = 16.304797887802124
+        self.clip_min = -3.2093127
+        self.clip_max = 16.304797887802124
 
         # new for ModernBert
-        self.clip_min = -1.207156
-        self.clip_max = 14.831477403640747
-        self.max_idx = max_idx
+        # self.clip_min = -1.207156
+        # self.clip_max = 14.831477403640747
+        # self.max_idx = max_idx
 
         self.sensitivity = abs(self.clip_max - self.clip_min)
 
@@ -358,7 +358,7 @@ class DPMLM():
             #Get top guesses: their token IDs, scores, and words.
             mask_logits = logits[m].squeeze()
             if TEMP == True:
-                mask_logits = mask_logits[:self.max_idx+1]
+                #mask_logits = mask_logits[:self.max_idx+1]
                 mask_logits = np.clip(mask_logits, self.clip_min, self.clip_max)
                 mask_logits = mask_logits / (2 * self.sensitivity / epsilon)
 
@@ -497,7 +497,7 @@ class DPMLM():
             if len(mask_logits) == 0:
                 predictions[current] = (targets[i], 0)
                 continue
-            mask_logits = mask_logits[:self.max_idx+1]
+            #mask_logits = mask_logits[:self.max_idx+1]
             mask_logits = np.clip(mask_logits, self.clip_min, self.clip_max)
             mask_logits = mask_logits / (2 * self.sensitivity / epsilon[i])
 
