@@ -459,7 +459,7 @@ class DPMLM():
             if CONCAT == False:
                 inputs = self.tokenizer(
                     masked_sents,
-                    max_length=1024,
+                    max_length=self.tokenizer.model_max_length,
                     return_tensors="pt",
                     padding=True,
                     truncation=True,
@@ -472,7 +472,7 @@ class DPMLM():
                 inputs = self.tokenizer(
                     text=original_sents,
                     text_pair=masked_sents,
-                    max_length=1024,
+                    max_length=self.tokenizer.model_max_length,
                     return_tensors="pt",
                     padding=True,
                     truncation=True,
@@ -517,11 +517,20 @@ class DPMLM():
 
         return predictions
     
+    def sliding_window(self, tokens, target_idx, max_len):
+        length = len(tokens)
+        lower = max(0, int(target_idx-(max_len/2)))
+        remaining = max_len - (target_idx - lower)
+        upper = min(length, target_idx+remaining)
+        return lower, upper
+
     def dpmlm_rewrite(self, sentence, epsilon, REPLACE=False, FILTER=False, STOP=False, TEMP=True, POS=True, CONCAT=True):
         if isinstance(sentence, list):
             tokens = sentence
         else:
-            tokens = nltk.word_tokenize(sentence)
+            #tokens = nltk.word_tokenize(sentence)
+            encoded = self.tokenizer.encode(sentence)
+            tokens =[x for x in self.tokenizer.batch_decode(encoded) if x != ""]
 
         if isinstance(epsilon, list):
             word_eps = epsilon
@@ -546,12 +555,16 @@ class DPMLM():
                 continue
 
             if REPLACE == True:
-                new_s = " ".join(new_tokens)
-                new_n = sentence_enum(new_tokens)
-                res = self.privatize(sentence, t, n=new_n[i], ENGLISH=True, FILTER=FILTER, epsilon=eps, MS=new_s, TEMP=TEMP, POS=POS, CONCAT=CONCAT)
+                lower, upper = self.sliding_window(new_tokens, i, self.tokenizer.model_max_length)
+                new_s = " ".join(new_tokens[lower:upper])
+                new_n = sentence_enum(new_tokens[lower:upper])
+                t_sentence = self.tokenizer.decode(encoded[lower:upper], skip_special_tokens=True)
+                res = self.privatize(t_sentence, t, n=new_n[i], ENGLISH=True, FILTER=FILTER, epsilon=eps, MS=new_s, TEMP=TEMP, POS=POS, CONCAT=CONCAT)
                 r = res[t+"_{}".format(new_n[i])]
                 new_tokens[i] = r
             else:
+                lower, upper = self.sliding_window(tokens, i, self.tokenizer.model_max_length)
+                t_sentence = self.tokenizer.decode(encoded[lower:upper], skip_special_tokens=True)
                 res = self.privatize(sentence, t, n=nn, ENGLISH=True, FILTER=FILTER, epsilon=eps, TEMP=TEMP, POS=POS, CONCAT=CONCAT)
                 r = res[t+"_{}".format(nn)]
 
@@ -567,16 +580,20 @@ class DPMLM():
         return self.detokenizer.detokenize(replace), perturbed, total
     
     def dpmlm_rewrite_batch(self, sentence, epsilon, REPLACE=False, FILTER=False, STOP=False, POS=True, CONCAT=True, batch_size=16):
-        tokens = nltk.word_tokenize(sentence)
+        encoded = self.tokenizer.encode(sentence)
+        tokens = [x for x in self.tokenizer.batch_decode(encoded) if x != ""]
 
         if isinstance(epsilon, list):
             word_eps = epsilon
         else:
-            word_eps = [epsilon for i in range(len(tokens))]
-        new_tokens = [str(x) for x in tokens]
+            word_eps = [epsilon for _ in range(len(tokens))]
 
         n = sentence_enum(tokens)
-        batch = [sentence for _ in range(len(tokens))]
+        batch = []
+        for i in range(len(tokens)):
+            lower, upper = self.sliding_window(tokens, i, self.tokenizer.model_max_length)
+            batch.append(self.tokenizer.decode(encoded[lower:upper], skip_special_tokens=True))
+
         res = self.privatize_batch(batch, tokens, n=n, ENGLISH=True, FILTER=FILTER, epsilon=word_eps, POS=POS, CONCAT=CONCAT, batch_size=batch_size)
 
         replace = []
