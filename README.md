@@ -13,6 +13,20 @@ Otherwise, there are two main files, both of which arte easily importable and re
 
 `M.dpmlm_rewrite("hello world", epsilon=100)`
 
+### DP-MLM Batched Mode
+We have now implemented a "batched" mode for `DP-MLM`, which may enable you to see some performance increases, particularly on longer texts. This mode batches all of the masked token predictions within a text, this producing the private output in parallel.
+
+To use batching, simply run:
+
+`M.dpmlm_rewrite_batch("hello world", epsilon=100, batch_size=BATCH_SIZE)`
+
+Depending on your setup, you may need to tweak the `batch_size` parameter for the most optimal performance gains.
+
+### Input Document Length
+As of the newest 2025 release, `DP-MLM` no longer has the shortcoming of the 512 token context window (256 with concatentation), which was due to the limitations of MLM context windows.
+
+Now, `DP-MLM` operates with a *sliding window*, where the maximum context is given, centered around the target word to be privatized. Thus, `DP-MLM` now works on arbitrarily long documents!
+
 ## Usage of other evaluated models
 `M = LLMDP.DPPrompt()`
 
