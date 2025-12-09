@@ -315,12 +315,13 @@ class DPMLM():
         encoded = self.tokenizer.encode(sentence, add_special_tokens=False)
         split_sent = [x.strip() for x in self.tokenizer.batch_decode(encoded, skip_special_tokens=True) if x != ""]
         #split_sent = nltk.word_tokenize(sentence)
-        original_sent = ' '.join(split_sent)
+        #original_sent = ' '.join(split_sent)
+        original_sent = self.tokenizer.decode(encoded, skip_special_tokens=True)
         #orig_pos = [x.tag_ for x in self.nlp(original_sent)]
 
         # Masks the target word in the original sentence.
         if MS is None:
-            masked_sent = ' '.join(split_sent)
+            masked_sent = self.tokenizer.decode(encoded, skip_special_tokens=True)
         else:
             masked_sent = MS
 
