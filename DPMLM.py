@@ -312,7 +312,9 @@ class DPMLM():
         return final_score, prop_score, substitute_validation
 
     def privatize(self, sentence, target, n=1, K=5, CONCAT=True, FILTER=True, POS=False, ENGLISH=False, epsilon=1, MS=None, TEMP=False):
-        split_sent = nltk.word_tokenize(sentence)
+        encoded = self.tokenizer.encode(sentence)
+        split_sent = [x for x in self.tokenizer.batch_decode(encoded) if x != ""]
+        #split_sent = nltk.word_tokenize(sentence)
         original_sent = ' '.join(split_sent)
         #orig_pos = [x.tag_ for x in self.nlp(original_sent)]
 
@@ -443,7 +445,8 @@ class DPMLM():
                 end = None
             else:
                 end += batch_size
-            split_sents = [nltk.word_tokenize(sentence) for sentence in batch]
+
+            split_sents = [[x for x in self.tokenizer.batch_decode(self.tokenizer.encode(sentence)) if x != ""] for sentence in batch]
             original_sents = [' '.join(split_sent) for split_sent in split_sents]
 
             # Masks the target word in the original sentence.
@@ -530,7 +533,7 @@ class DPMLM():
         else:
             #tokens = nltk.word_tokenize(sentence)
             encoded = self.tokenizer.encode(sentence)
-            tokens =[x for x in self.tokenizer.batch_decode(encoded) if x != ""]
+            tokens = [x for x in self.tokenizer.batch_decode(encoded) if x != ""]
 
         if isinstance(epsilon, list):
             word_eps = epsilon
