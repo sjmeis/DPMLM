@@ -28,6 +28,25 @@ logging.set_verbosity_warning()
 
 stop = set([x for x in stopwords.words("english")])
 
+def nth_repl(self, s, sub, repl, n):
+    s_split = nltk.word_tokenize(s) #[x.strip() for x in self.tokenizer.batch_decode(self.tokenizer.encode(s, add_special_tokens=False), skip_special_tokens=True) if x != ""]
+    i = 0
+    try:
+        find = s_split.index(sub)
+        i += 1
+    except ValueError:
+        return s
+
+    while i != n:
+        try:
+            find = s_split.index(sub, find + 1)
+            i += 1
+        except ValueError:
+            break
+    if i == n:
+        return " ".join(s_split[:find] + [repl] + s_split[find+1:])
+    return s
+
 def nth_rem(s, sub, n):
     s_split = s.split()
     i = 0
@@ -276,25 +295,6 @@ class DPMLM():
         self.lm_model = self.lm_model.to(self.device)
         self.raw_model = self.raw_model.to(self.device)
 
-    def nth_repl(self, s, sub, repl, n):
-        s_split = [x.strip() for x in self.tokenizer.batch_decode(self.tokenizer.encode(s, add_special_tokens=False), skip_special_tokens=True) if x != ""]
-        i = 0
-        try:
-            find = s_split.index(sub)
-            i += 1
-        except ValueError:
-            return s
-        
-        while i != n:
-            try:
-                find = s_split.index(sub, find + 1)
-                i += 1
-            except ValueError:
-                break
-        if i == n:
-            return " ".join(s_split[:find] + [repl] + s_split[find+1:])
-        return s
-
     def load_transformers(self):
         return self.tokenizer, self.lm_model, self.raw_model
 
@@ -312,16 +312,16 @@ class DPMLM():
         return final_score, prop_score, substitute_validation
 
     def privatize(self, sentence, target, n=1, K=5, CONCAT=True, FILTER=True, POS=False, ENGLISH=False, epsilon=1, MS=None, TEMP=False):
-        encoded = self.tokenizer.encode(sentence, add_special_tokens=False)
-        split_sent = [x.strip() for x in self.tokenizer.batch_decode(encoded, skip_special_tokens=True) if x != ""]
-        #split_sent = nltk.word_tokenize(sentence)
-        #original_sent = ' '.join(split_sent)
-        original_sent = self.tokenizer.decode(encoded, skip_special_tokens=True)
+        #encoded = self.tokenizer.encode(sentence, add_special_tokens=False)
+        #split_sent = [x.strip() for x in self.tokenizer.batch_decode(encoded, skip_special_tokens=True) if x != ""]
+        split_sent = nltk.word_tokenize(sentence)
+        original_sent = ' '.join(split_sent)
+        #original_sent = self.tokenizer.decode(encoded, skip_special_tokens=True)
         #orig_pos = [x.tag_ for x in self.nlp(original_sent)]
 
         # Masks the target word in the original sentence.
         if MS is None:
-            masked_sent = self.tokenizer.decode(encoded, skip_special_tokens=True)
+            masked_sent = ' '.join(split_sent) # self.tokenizer.decode(encoded, skip_special_tokens=True)
         else:
             masked_sent = MS
 
@@ -330,9 +330,9 @@ class DPMLM():
                 n = [1 for _ in range(len(target))]
 
             for t, nn in zip(target, n):
-                masked_sent = self.nth_repl(masked_sent, t, self.tokenizer.mask_token, nn)
+                masked_sent = nth_repl(masked_sent, t, self.tokenizer.mask_token, nn)
         else:
-            masked_sent = self.nth_repl(masked_sent, target, self.tokenizer.mask_token, n)
+            masked_sent = nth_repl(masked_sent, target, self.tokenizer.mask_token, n)
             n = [n]
 
         #Get the input token IDs of the input consisting of: the original sentence + separator + the masked sentence.
@@ -457,7 +457,7 @@ class DPMLM():
                 masked_sents = MS
 
             for i, (t, nn) in enumerate(zip(targets_batch, n_batch)):
-                masked_sents[i] = self.nth_repl(masked_sents[i], t, self.tokenizer.mask_token, nn)
+                masked_sents[i] = nth_repl(masked_sents[i], t, self.tokenizer.mask_token, nn)
 
             #Get the input token IDs of the input consisting of: the original sentence + separator + the masked sentence.
             if CONCAT == False:
