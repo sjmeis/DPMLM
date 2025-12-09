@@ -270,10 +270,10 @@ class DPMLM():
             scores = torch.softmax(torch.from_numpy(mask_logits), dim=0)
             scores = scores / scores.sum()
             chosen_idx = np.random.choice(logits_idx, p=scores.numpy())
-            predictions[current] = (self.tokenizer.decode(chosen_idx).strip(), scores[chosen_idx])
+            predictions[current] = self.tokenizer.decode(chosen_idx).strip() #(self.tokenizer.decode(chosen_idx).strip(), scores[chosen_idx])
 
-        for p in predictions:
-            predictions[p] = predictions[p][0]
+        # for p in predictions:
+        #     predictions[p] = predictions[p][0]
 
         del outputs
         with torch.no_grad():
