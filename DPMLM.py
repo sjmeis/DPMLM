@@ -261,7 +261,7 @@ class DPMLM():
 
             mask_logits = outputs[i][masked_position[i]].squeeze().detach().cpu().numpy()
             if len(mask_logits) == 0:
-                predictions[current] = (targets[i], 0)
+                predictions[current] = targets[i] # (targets[i], 0)
                 continue
             mask_logits = np.clip(mask_logits, self.clip_min, self.clip_max)
             mask_logits = mask_logits / (2 * self.sensitivity / epsilon[i])
