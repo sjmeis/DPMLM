@@ -21,15 +21,13 @@ import gc
 
 torch.set_float32_matmul_precision('medium')
 
-en = wn.Wordnet('oewn:2022') 
-
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
 logging.set_verbosity_warning()
 
 stop = set([x for x in stopwords.words("english")])
 
 def nth_repl(s, sub, repl, n):
-    s_split = nltk.word_tokenize(s) #[x.strip() for x in self.tokenizer.batch_decode(self.tokenizer.encode(s, add_special_tokens=False), skip_special_tokens=True) if x != ""]
+    s_split = nltk.word_tokenize(s)
     i = 0
     try:
         find = s_split.index(sub)
@@ -84,184 +82,6 @@ def get_vocab():
 		vocab = set([x.strip() for x in f.readlines()])
 	return vocab
 
-def get_antonyms(word):
-    ants = list()
-
-    #Get antonyms from WordNet for this word and any of its synonyms.
-    for ss in en.synsets(word):
-        for sense in ss.senses():
-            ants.extend([x.word().lemma() for x in sense.get_related("antonym")])
-
-    #Get snyonyms of antonyms found in the previous step, thus expanding the list even more.
-    syns = list()
-    for word in list(set(ants)):
-        for ss in en.synsets(word):
-            syns.extend(ss.lemmas())
-
-    return sorted(list(set(syns)))
-
-'''
-Gets pertainyms of the target word from the WordNet knowledge base.
-* pertainyms = words pertaining to the target word (industrial -> pertainym is "industry")
-'''
-def get_pertainyms(word):
-    perts = list()
-    for ss in en.synsets(word):
-        for sense in ss.senses():
-            perts.extend([x.word().lemma() for x in sense.get_related("pertainym")])
-    return sorted(list(set(perts)))
-'''
-Get hyponyms (new wn)
-'''
-def get_hyponyms(word):
-    hypo = list()
-    for ss in en.synsets(word):
-        for sense in ss.senses():
-            hypo.extend([x.word().lemma() for x in sense.get_related("hyponyms")])
-    return sorted(list(set(hypo)))
-
-'''
-Get hypernyms (new wn)
-'''
-def get_hypernyms(word):
-    hyper = list()
-    for ss in en.synsets(word):
-        for h in ss.hypernyms():
-            hyper.extend([x.lemma() for x in h.words()])
-    return sorted(list(set(hyper)))
-
-'''
-Gets derivationally related forms (e.g. begin -> 'beginner', 'beginning')
-'''
-def get_related_forms(word):
-    forms = list()
-    for ss in wn.synsets(word):
-        for sense in ss.senses():
-            forms.extend([x.word().lemma() for x in sense.get_related("derivation")]) 
-    return sorted(list(set(forms)))
-
-'''
-General get nym
-'''
-def get_general_nym(word, nym):
-    n = list()
-    for ss in wn.synsets(word):
-        for sense in ss.senses():
-            n.extend([x.word().lemma() for x in sense.get_related(nym)]) 
-    return sorted(list(set(n)))
-
-'''
-Gets antonyms, hypernyms, hyponyms, holonyms, meronyms, pertainyms, and derivationally related forms of a target word from WordNet.
-* hypernym = a word whose meaning includes a group of other words ("animal" is a hypernym of "dog")
-* hyponym = a word whose meaning is included in the meaning of another word ("bulldog" is a hyponym of "dog")
-* a meronym denotes a part and a holonym denotes a whole: "week" is a holonym of "weekend", "eye" is a meronym of "face", and vice-versa
-'''
-def get_nyms(word, depth=-1):
-    nym_list = ['antonyms', 'hypernyms', 'hyponyms', 'holonyms', 'meronyms', 
-                'pertainyms', 'derivationally_related_forms']
-    results = list()
-    lemmatizer = WordNetLemmatizer()
-    word = lemmatizer.lemmatize(word)
-
-    def query_wordnet(getter):
-        res = list()
-        for ss in en.synsets(word):
-            res_list = [item.lemmas() for item in ss.closure(getter)]
-            res_list = [item.name() for sublist in res_list for item in sublist]
-            res.extend(res_list)
-        return res
-
-    for nym in nym_list:
-        if nym=='antonyms':
-            results.append(get_antonyms(word))
-
-        elif nym == "hypernyms":
-            results.append(get_hypernyms(word))
-
-        elif nym == "hyponyms":
-            results.append(get_hyponyms(word))
-
-        elif nym in ['holonyms', 'meronyms']:
-            res = list()
-            #Three different types of holonyms and meronyms as defined in WordNet
-            for postfix in ["_member", "_part", "_portion", "_substance"]:
-                res.extend(get_general_nym(word, "{}{}".format(nym[:4], postfix)))
-            results.append(res)
-
-        elif nym=='pertainyms':
-            results.append(get_pertainyms(word))
-
-        else:
-            results.append(get_related_forms(word))
-
-    results = map(set, results)
-    nyms = dict(zip(nym_list, results))
-    return nyms
-
-#Converts a part-of-speech tag returned by NLTK to a POS tag from WordNet
-def get_wordnet_pos(treebank_tag):
-    if treebank_tag.startswith('J'):
-        return wn.ADJ
-    elif treebank_tag.startswith('V'):
-        return wn.VERB
-    elif treebank_tag.startswith('N'):
-        return wn.NOUN
-    elif treebank_tag.startswith('R'):
-        return wn.ADV
-    else:
-        return ''
-
-#Function for clearing up duplicate words (capitalized, upper-case, etc.), stop words, and antonyms from the list of candidates.
-def filter_words(target, words, scr, tkn, opp={}):
-    dels = list()
-    toks = tkn.tolist()
-    nyms = get_nyms(target)
-    lemmatizer = WordNetLemmatizer()
-
-    if lemmatizer.lemmatize(target.lower()) in opp:
-        opp_del = [x for x in words if lemmatizer.lemmatize(x.lower()) in opp[lemmatizer.lemmatize(target.lower())]]
-        dels.extend(opp_del)
-
-    for w in words:
-        if w.lower() in words and w.upper() in words:
-            dels.append(w.upper())
-        if lemmatizer.lemmatize(w.lower()) in nyms['antonyms']:
-            dels.append(w)
-
-    dels = list(set(dels))
-    for d in dels:
-        del scr[words.index(d)]
-        del toks[words.index(d)]
-        words.remove(d)
-
-    return words, scr, torch.tensor(toks)
-
-#Calculates the similarity score
-def similarity_score(original_output, subst_output, k):
-    mask_idx = k
-    cos_sim = torch.nn.CosineSimilarity(dim=1, eps=1e-6)
-    weights = torch.div(torch.stack(list(original_output[3])).squeeze().sum(0).sum(0), (12 * 12.0))
-
-    suma = 0.0
-    sent_len = original_output[2][2].shape[1]
-
-    for token_idx in range(sent_len):     
-        original_hidden = original_output[2]
-        subst_hidden = subst_output[2]
-
-        #Calculate the contextualized representation of the i-th word as a concatenation of RoBERTa's values in its last four layers
-        context_original = torch.cat( tuple( [original_hidden[hs_idx][:, token_idx, :] for hs_idx in [1, 2, 3, 4]] ), dim=1)
-        context_subst = torch.cat( tuple( [subst_hidden[hs_idx][:, token_idx, :] for hs_idx in [1, 2, 3, 4]] ), dim=1)
-        suma += weights[mask_idx][token_idx] * cos_sim(context_original, context_subst)
-
-    substitute_validation = suma
-    return substitute_validation
-
-#Calculates the proposal score
-def proposal_score(original_score, subst_scores, device):
-    subst_scores = torch.tensor(subst_scores).to(device)
-    return np.log( torch.div(subst_scores , (1.0 - original_score)).cpu() )
-
 class DPMLM():
     opposites = get_opposites()
     vocab = get_vocab()
@@ -298,37 +118,12 @@ class DPMLM():
     def load_transformers(self):
         return self.tokenizer, self.lm_model, self.raw_model
 
-    #Calculates the proposal scores, substitute validation scores, and then the final score for each candidate word's fit as a substitution.
-    def calc_scores(self, scr, sentences, original_output, original_score, mask_index):
-        #Get representations of all substitute sentences
-        _, _, raw_model = self.load_transformers()
-        subst_output = raw_model(sentences)
-
-        prop_score = proposal_score(original_score, scr, self.device)
-        substitute_validation = similarity_score(original_output, subst_output, mask_index)
-
-        final_score = substitute_validation.cpu() + self.alpha*prop_score
-        
-        return final_score, prop_score, substitute_validation
-
-    def privatize(self, sentence, target, n, start_index, K=5, CONCAT=True, FILTER=True, POS=False, ENGLISH=False, epsilon=1, TEMP=False):
-        #encoded = self.tokenizer.encode(sentence, add_special_tokens=False)
-        #split_sent = [x.strip() for x in self.tokenizer.batch_decode(encoded, skip_special_tokens=True) if x != ""]
+    def privatize(self, sentence, target, n, start_index, CONCAT=True, epsilon=1):
         split_sent = nltk.word_tokenize(sentence)
         original_sent = ' '.join(split_sent)
-        #original_sent = self.tokenizer.decode(encoded, skip_special_tokens=True)
-        #orig_pos = [x.tag_ for x in self.nlp(original_sent)]
 
         # Masks the target word in the original sentence.
         masked_sent = ' '.join(split_sent) # self.tokenizer.decode(encoded, skip_special_tokens=True)
-
-        # if isinstance(target, list):
-        #     if n == 1:
-        #         n = [1 for _ in range(len(target))]
-
-        #     for t, nn in zip(target, n):
-        #         masked_sent = nth_repl(masked_sent, t, self.tokenizer.mask_token, nn)
-        #else:
         masked_sent = nth_repl(masked_sent, target, self.tokenizer.mask_token, n)
         n = [n]
 
@@ -341,13 +136,10 @@ class DPMLM():
             input_ids = self.tokenizer.encode(" "+masked_sent, add_special_tokens=True, truncation=True)
         else:
             input_ids = self.tokenizer.encode(" "+original_sent.replace("MASK", ""), " "+masked_sent, add_special_tokens=True, truncation="only_first")
-        if isinstance(target, list):
-            masked_position = np.where(np.array(input_ids) == self.tokenizer.mask_token_id)[0].tolist()
-        else:
-            masked_position = [input_ids.index(self.tokenizer.mask_token_id)]
-            target = [target]
+        masked_position = [input_ids.index(self.tokenizer.mask_token_id)]
+        target = [target]
 
-        original_output = self.raw_model(torch.tensor(input_ids).reshape(1, len(input_ids)).to(self.device))
+        #original_output = self.raw_model(torch.tensor(input_ids).reshape(1, len(input_ids)).to(self.device))
 
         #Get the predictions of the Masked LM transformer.
         with torch.no_grad():
@@ -361,67 +153,17 @@ class DPMLM():
 
             #Get top guesses: their token IDs, scores, and words.
             mask_logits = logits[m].squeeze()
-            if TEMP == True:
-                #mask_logits = mask_logits[:self.max_idx+1]
-                mask_logits = np.clip(mask_logits, self.clip_min, self.clip_max)
-                mask_logits = mask_logits / (2 * self.sensitivity / epsilon)
+            mask_logits = np.clip(mask_logits, self.clip_min, self.clip_max)
+            mask_logits = mask_logits / (2 * self.sensitivity / epsilon)
 
-                logits_idx = [i for i, x in enumerate(mask_logits)]
-                scores = torch.softmax(torch.from_numpy(mask_logits), dim=0)
-                scores = scores / scores.sum()
-                chosen_idx = np.random.choice(logits_idx, p=scores.numpy())
-                predictions[current] = (self.tokenizer.decode(chosen_idx).strip(), scores[chosen_idx])
-                continue
-            else:
-                top_tokens = torch.topk(torch.from_numpy(mask_logits), k=K, dim=0)[1]
-                scores = torch.softmax(torch.from_numpy(mask_logits), dim=0)[top_tokens].tolist()
-            words = [self.tokenizer.decode(i.item()).strip() for i in top_tokens]
-
-            if FILTER == True:
-                words, scores, top_tokens = filter_words(t, words, scores, top_tokens, self.opposites)
-
-            if len(words) == 0:
-                predictions[current] = [(t, 1)]
-                continue
-
-            assert len(words) == len(scores)
-
-            if len(words) == 0:
-                predictions[current] = [(t, 1)]
-                continue
-
-            original_score = torch.softmax(torch.from_numpy(mask_logits), dim=0)[m]
-            sentences = list()
-
-            for i in range(len(words)):
-                subst_word = top_tokens[i]
-                input_ids[m] = int(subst_word)
-                sentences.append(list(input_ids))
-
-            torch_sentences = torch.tensor(sentences).to(self.device)
-
-            finals, _, _ = self.calc_scores(scores, torch_sentences, original_output, original_score, m)
-            finals = map(lambda f : float(f), finals)
-
-            zipped = dict(zip(words, finals))
-            for i in range(len(words)):
-                cand = words[i]
-                if cand not in zipped:
-                    continue
-                
-                # remove non-words
-                if ENGLISH == True:
-                    if cand not in self.vocab and self.lemmatizer.lemmatize(cand) not in self.vocab:
-                        del zipped[cand]
-                        continue
-
-            zipped = dict(zipped)
-            finish = list(sorted(zipped.items(), key=lambda item: item[1], reverse=True))[:K]
-            predictions[current] = finish
-
-        if TEMP == True:
-            for p in predictions:
-                predictions[p] = predictions[p][0]
+            logits_idx = [i for i, x in enumerate(mask_logits)]
+            scores = torch.softmax(torch.from_numpy(mask_logits), dim=0)
+            scores = scores / scores.sum()
+            chosen_idx = np.random.choice(logits_idx, p=scores.numpy())
+            predictions[current] = (self.tokenizer.decode(chosen_idx).strip(), scores[chosen_idx])
+        
+        for p in predictions:
+            predictions[p] = predictions[p][0]
 
         return predictions
     
@@ -529,7 +271,7 @@ class DPMLM():
         upper = min(length, target_idx+remaining)
         return lower, upper
 
-    def dpmlm_rewrite(self, sentence, epsilon, REPLACE=False, FILTER=False, STOP=False, TEMP=True, POS=True, CONCAT=True):
+    def dpmlm_rewrite(self, sentence, epsilon, REPLACE=False, STOP=False, CONCAT=True):
         if isinstance(sentence, list):
             tokens = sentence
         else:
@@ -569,7 +311,7 @@ class DPMLM():
                 r = res[t+"_{}".format(new_n[i])]
                 new_tokens[i] = r
             else:
-                res = self.privatize(sentence, t, nn, i, ENGLISH=True, FILTER=FILTER, epsilon=eps, TEMP=TEMP, POS=POS, CONCAT=CONCAT)
+                res = self.privatize(sentence, t, nn, i, epsilon=eps, CONCAT=CONCAT)
                 r = res[t+"_{}".format(nn)]
 
             if tokens[i][0].isupper() == True:
@@ -583,7 +325,7 @@ class DPMLM():
 
         return self.detokenizer.detokenize(replace), perturbed, total
     
-    def dpmlm_rewrite_batch(self, sentence, epsilon, REPLACE=False, FILTER=False, STOP=False, POS=True, CONCAT=True, batch_size=16):
+    def dpmlm_rewrite_batch(self, sentence, epsilon, REPLACE=False, STOP=False, CONCAT=True, batch_size=16):
         sentence = " ".join(sentence.split("\n"))
         encoded = self.tokenizer.encode(sentence, add_special_tokens=False)
         tokens = [x for x in self.tokenizer.batch_decode(encoded, skip_special_tokens=True) if x != ""]
@@ -599,7 +341,7 @@ class DPMLM():
             lower, upper = self.sliding_window(tokens, i, int((self.tokenizer.model_max_length-32)/2))
             batch.append(self.tokenizer.decode(encoded[lower:upper], skip_special_tokens=True))
 
-        res = self.privatize_batch(batch, tokens, n=n, ENGLISH=True, FILTER=FILTER, epsilon=word_eps, POS=POS, CONCAT=CONCAT, batch_size=batch_size)
+        res = self.privatize_batch(batch, tokens, n=n, epsilon=word_eps, CONCAT=CONCAT, batch_size=batch_size)
 
         replace = []
         for i, r in enumerate(res):
