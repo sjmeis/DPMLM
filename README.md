@@ -1,24 +1,61 @@
 # DP-MLM
-This is the code repository for the ACL Findings paper: *DP-MLM: Differentially Private Text Rewriting Using Masked Language Models*
+This is the code and package repository for the ACL Findings paper: *DP-MLM: Differentially Private Text Rewriting Using Masked Language Models*
 
 ## Setup
-In this repository, you will find a `requirements.txt` file, which contains all necessary Python dependencies.
+### Installation
+You can install the package directly using:
 
-Otherwise, there are two main files, both of which arte easily importable and reusable:
-- `DPMLM.py`: code for running the `DP-MLM` mechanism. `privatize` replaces a single token, while `dpmlm_rewrite` will rewrite an entire text.
+```bash
+pip install dpmlm
+```
+
+Optionally, you can install from source. In this repository, you will find a `requirements.txt` file, which contains all necessary Python dependencies.
+
+Otherwise, there are one other include file for replication of the paper, which is easily importable and reusable:
 - `LLMDP.py`: implementations of both `DP-Paraphrase` and `DP-Prompt`. Note that for `DP-Prompt`, you will need to download the corresponding LMs, i.e., from Hugging Face.
 
-## Usage of DP-MLM
-`M = DPMLM.DPMLM()`
+### Resource Bootstrapping
+Before running the mechanism, you need to download the necessary NLTK libraries:
 
-`M.dpmlm_rewrite("hello world", epsilon=100)`
+```python
+from DPMLM.utils import setup_resources
+
+setup_resources()
+```
+
+## Usage of DP-MLM
+The core logic resides in the DPMLM class. You can now initialize it with custom calibration bounds to ensure the DP privatization is tuned to your specific model (and bounding strategy).
+
+```python
+from DPMLM import DPMLM
+from DPMLM.utils import calculate_logit_bounds
+
+# 1. (Optional) Calibrate bounds for your specific model (e.g., RoBERTa)
+bounds = calculate_logit_bounds("FacebookAI/roberta-base")
+
+# 2. Instantiate the mechanism
+M = DPMLM(MODEL="FacebookAI/roberta-base", calibration=bounds, bound_strategy=None)
+
+# 3. Rewrite text
+private_text = M.dpmlm_rewrite("Hello world, this is a private text.", epsilon=25)
+```
+
+If you want to set a bounding strategy for the clip bounds (beyond simple min/max selection), you can do so by passing a lambda function:
+
+```python
+# strategy as used in the paper
+strategy = lamba mean, std, low, high: (mean, mean + 4*std)
+M = DPMLM(MODEL="FacebookAI/roberta-base", calibration=bounds, bound_strategy=strategy)
+```
 
 ### DP-MLM Batched Mode
-We have now implemented a "batched" mode for `DP-MLM`, which may enable you to see some performance increases, particularly on longer texts. This mode batches all of the masked token predictions within a text, this producing the private output in parallel.
+For longer documents, the batched mode provides significant performance increases by parallelizing masked token predictions on the GPU.
 
 To use batching, simply run:
 
-`M.dpmlm_rewrite_batch("hello world", epsilon=100, batch_size=BATCH_SIZE)`
+```python
+M.dpmlm_rewrite_batch("Large document text...", epsilon=25, batch_size=16)
+```
 
 Depending on your setup, you may need to tweak the `batch_size` parameter for the most optimal performance gains.
 
@@ -35,10 +72,6 @@ Now, `DP-MLM` operates with a *sliding window*, where the maximum context is giv
 ## Important notes
 In order to use `LLMDP.DPParaphrase`, you must download the fine-tuned model directory.
 This can be found at the following link: [Model](https://drive.google.com/drive/folders/1w_6MHQEw9LGkOHx_K1tc6t9djzrprITp?usp=sharing)
-
-Also, you will need to download the wordnet 2022 corpus: `python -m wn download oewn:2022`
-
-Finally, each code implementation sets specific clipping bounds, which was done for the purposes of comparable evaluation in the paper. These can be freely changed in the parameters, and should be experimented with for (possibly) better performance.
 
 ## Citation
 Please consider citing the original work that introduced `DP-MLM`. Thank you!

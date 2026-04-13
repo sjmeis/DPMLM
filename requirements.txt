@@ -6,3 +6,6 @@ torch
 transformers
 wn
 tqdm
+presidio-analyzer
+presidio-anonymizer
+pytextspan
