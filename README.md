@@ -20,9 +20,6 @@ pip install dp-mlm
 
 Optionally, you can install from source. In this repository, you will find a `requirements.txt` file, which contains all necessary Python dependencies.
 
-Otherwise, there are one other include file for replication of the paper, which is easily importable and reusable:
-- `LLMDP.py`: implementations of both `DP-Paraphrase` and `DP-Prompt`. Note that for `DP-Prompt`, you will need to download the corresponding LMs, i.e., from Hugging Face.
-
 ### Resource Bootstrapping
 Before running the mechanism, you need to download the necessary NLTK libraries:
 
@@ -74,6 +71,9 @@ As of the newest 2025 release, `DP-MLM` no longer has the shortcoming of the 512
 Now, `DP-MLM` operates with a *sliding window*, where the maximum context is given, centered around the target word to be privatized. Thus, `DP-MLM` now works on arbitrarily long documents!
 
 ## Usage of other evaluated models
+There is one other included file for replication of the paper, which is easily importable and reusable:
+- `LLMDP.py`: implementations of both `DP-Paraphrase` and `DP-Prompt`. Note that for `DP-Prompt`, you will need to download the corresponding LMs, i.e., from Hugging Face.
+
 `M = LLMDP.DPPrompt()`
 
 `M.privatize("hello world", epsilon=100)`
