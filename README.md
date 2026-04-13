@@ -1,12 +1,21 @@
-# DP-MLM
-This is the code and package repository for the ACL Findings paper: *DP-MLM: Differentially Private Text Rewriting Using Masked Language Models*
+<div align="center">
+
+  # DP-MLM
+
+  [![PyPI version](https://img.shields.io/pypi/v/dp-mlm.svg)](https://pypi.org/project/dp-mlm/)
+  [![GitHub stars](https://img.shields.io/github/stars/sjmeis/DPMLM.svg?style=social)](https://github.com/sjmeis/DPMLM/stargazers)
+  [![License](https://img.shields.io/github/license/sjmeis/DPMLM.svg)](https://github.com/sjmeis/DPMLM/blob/main/LICENSE)
+
+</div>
+
+This is the code and package repository for the ACL 2024 Findings paper: *DP-MLM: Differentially Private Text Rewriting Using Masked Language Models*
 
 ## Setup
 ### Installation
 You can install the package directly using:
 
 ```bash
-pip install dpmlm
+pip install dp-mlm
 ```
 
 Optionally, you can install from source. In this repository, you will find a `requirements.txt` file, which contains all necessary Python dependencies.
