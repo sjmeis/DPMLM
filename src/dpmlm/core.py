@@ -429,7 +429,7 @@ class DPMLM():
 
         for i, t in enumerate(tokens):
             if (all_mask and all_mask[i]) or \
-            (not STOP and t.lower() in self.stop) or \
+            (not STOP and t.lower() in stop) or \
             (t in string.punctuation):
                 continue
             indices_to_process.append(i)
