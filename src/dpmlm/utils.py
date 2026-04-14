@@ -7,6 +7,8 @@ import json
 import nltk
 import subprocess
 import sys
+import os
+import gc
 
 def setup_resources():
     """
@@ -79,3 +81,32 @@ def calculate_logit_bounds(model_name, batch_size=16, percentile=0.01, device=No
         "sensitivity": float(abs(clip_max - clip_min)),
         "raw_stats": stats
     }
+
+def cleanup(model_instances=None):
+    """
+    Clears GPU memory and performs garbage collection.
+    :param model_instances: Optional list of objects (DP-MLM instances) to delete.
+    """
+    print("Cleaning up...")
+
+    if model_instances:
+        if not isinstance(model_instances, list):
+            model_instances = [model_instances]
+        for obj in model_instances:
+            # We target the actual heavy attributes
+            if hasattr(obj, 'lm_model'):
+                del obj.lm_model
+            if hasattr(obj, 'ipi_pipe'):
+                del obj.ipi_pipe
+            del obj
+            
+    gc.collect()
+    
+    if torch.cuda.is_available():
+        with torch.no_grad():
+            torch.cuda.empty_cache()
+            torch.cuda.ipc_collect()
+
+    gc.collect()
+            
+    print("✓ GPU VRAM cleared and garbage collected.")

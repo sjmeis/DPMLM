@@ -34,7 +34,7 @@ The core logic resides in the DPMLM class. You can now initialize it with custom
 
 ```python
 from dpmlm import DPMLM
-from dpmlm.utils import calculate_logit_bounds
+from dpmlm.utils import calculate_logit_bounds, cleanup
 
 # 1. (Optional) Calibrate bounds for your specific model (e.g., RoBERTa)
 bounds = calculate_logit_bounds("FacebookAI/roberta-base")
@@ -44,6 +44,9 @@ M = DPMLM(MODEL="FacebookAI/roberta-base", calibration=bounds, bound_strategy=No
 
 # 3. Rewrite text
 private_text = M.dpmlm_rewrite("Hello world, this is a private text.", epsilon=25)
+
+# 4. Cleanup (optional, when finished)
+cleanup(model_instances=[M])
 ```
 
 If you want to set a bounding strategy for the clip bounds (beyond simple min/max selection), you can do so by passing a lambda function:
