@@ -157,7 +157,7 @@ class DPMLM():
         #Get the predictions of the Masked LM transformer.
         with torch.no_grad():
             output = self.lm_model(torch.tensor(input_ids).reshape(1, len(input_ids)).to(self.device))
-            mask_logits = output[0, masked_position].detach().cpu().numpy()
+            mask_logits = output.logits[0, masked_position].squeeze().cpu().numpy()
 
         #Get top guesses: their token IDs, scores, and words.
         mask_logits = np.clip(mask_logits, self.clip_min, self.clip_max)
