@@ -2,7 +2,7 @@
 
   # DP-MLM
 
-  [![PyPI version](https://img.shields.io/pypi/v/dp-mlm.svg)](https://pypi.org/project/dp-mlm/)
+  [![PyPI version](https://img.shields.io/pypi/v/dpmlm.svg)](https://pypi.org/project/dpmlm/)
   [![GitHub stars](https://img.shields.io/github/stars/sjmeis/DPMLM.svg?style=social)](https://github.com/sjmeis/DPMLM/stargazers)
   [![License](https://img.shields.io/github/license/sjmeis/DPMLM.svg)](https://github.com/sjmeis/DPMLM/blob/main/LICENSE)
 
@@ -15,7 +15,7 @@ This is the code and package repository for the ACL 2024 Findings paper: *DP-MLM
 You can install the package directly using:
 
 ```bash
-pip install dp-mlm
+pip install dpmlm
 ```
 
 Optionally, you can install from source. In this repository, you will find a `requirements.txt` file, which contains all necessary Python dependencies.
@@ -24,7 +24,7 @@ Optionally, you can install from source. In this repository, you will find a `re
 Before running the mechanism, you need to download the necessary NLTK libraries:
 
 ```python
-from DPMLM.utils import setup_resources
+from dpmlm.utils import setup_resources
 
 setup_resources()
 ```
@@ -33,8 +33,8 @@ setup_resources()
 The core logic resides in the DPMLM class. You can now initialize it with custom calibration bounds to ensure the DP privatization is tuned to your specific model (and bounding strategy).
 
 ```python
-from DPMLM import DPMLM
-from DPMLM.utils import calculate_logit_bounds
+from dpmlm import DPMLM
+from dpmlm.utils import calculate_logit_bounds
 
 # 1. (Optional) Calibrate bounds for your specific model (e.g., RoBERTa)
 bounds = calculate_logit_bounds("FacebookAI/roberta-base")
