@@ -50,7 +50,7 @@ If you want to set a bounding strategy for the clip bounds (beyond simple min/ma
 
 ```python
 # strategy as used in the paper
-strategy = lamba mean, std, low, high: (mean, mean + 4*std)
+strategy = lambda mean, std, low, high: (mean, mean + 4*std)
 M = DPMLM(MODEL="FacebookAI/roberta-base", calibration=bounds, bound_strategy=strategy)
 ```
 
