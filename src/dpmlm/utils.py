@@ -23,7 +23,7 @@ def setup_resources():
 
     print("Setup complete.")
 
-def calculate_logit_bounds(model_name, calibration_texts, batch_size=16, percentile=0.01, device=None, bound_strategy=None):
+def calculate_logit_bounds(model_name, batch_size=16, percentile=0.01, device=None, bound_strategy=None):
     """
     Analyzes a model's logit distribution across raw text to determine DP clipping bounds.
     """
@@ -34,7 +34,7 @@ def calculate_logit_bounds(model_name, calibration_texts, batch_size=16, percent
     model = AutoModelForMaskedLM.from_pretrained(model_name).to(device)
     model.eval()
 
-    with open(impresources.files("DPMLM") / "data" / "calibration.txt", 'r') as f:
+    with open(impresources.files("dpmlm") / "data" / "calibration.txt", 'r') as f:
         calibration_texts = json.load(f)
 
     all_logits = []
@@ -63,8 +63,8 @@ def calculate_logit_bounds(model_name, calibration_texts, batch_size=16, percent
     stats = {
         "mean": np.mean(flattened),
         "std": np.std(flattened),
-        "q_low": np.percentile(flattened, 1),
-        "q_high": np.percentile(flattened, 99)
+        "q_low": np.percentile(flattened, percentile),
+        "q_high": np.percentile(flattened, 1-percentile)
     }
 
     if bound_strategy:
