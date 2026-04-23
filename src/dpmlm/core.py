@@ -1,4 +1,3 @@
-import os
 import torch
 import nltk
 import string
@@ -10,11 +9,9 @@ from transformers import AutoModel, AutoTokenizer, AutoModelForMaskedLM, logging
 import textspan
 
 from presidio_analyzer import AnalyzerEngine
-#from presidio_anonymizer import AnonymizerEngine
 
-torch.set_float32_matmul_precision('medium')
+torch.backends.cuda.matmul.fp32_precision = 'medium'
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
 logging.set_verbosity_warning()
 
 stop = set(stopwords.words("english"))
@@ -32,52 +29,6 @@ def remove_at_index(token_list, index):
     if 0 <= index < len(new_tokens):
         new_tokens.pop(index)
     return new_tokens
-
-# def nth_repl(s, sub, repl, n):
-#     s_split = nltk.word_tokenize(s)
-#     i = 0
-#     try:
-#         find = s_split.index(sub)
-#         i += 1
-#     except ValueError:
-#         return s
-
-#     while i != n:
-#         try:
-#             find = s_split.index(sub, find + 1)
-#             i += 1
-#         except ValueError:
-#             break
-#     if i == n:
-#         return " ".join(s_split[:find] + [repl] + s_split[find+1:])
-#     return s
-
-# def nth_rem(s, sub, n):
-#     s_split = s.split()
-#     i = 0
-#     try:
-#         find = s_split.index(sub)
-#         i += 1
-#     except ValueError:
-#         return s
-    
-#     while i != n:
-#         try:
-#             find = s_split.index(sub, find + 1)
-#             i += 1
-#         except ValueError:
-#             break
-#     if i == n:
-#         return " ".join(s_split[:find] + s_split[find+1:])
-#     return s
-
-# def sentence_enum(tokens):
-#     counts = Counter()
-#     n = []
-#     for t in tokens:
-#         counts[t] += 1
-#         n.append(counts[t])
-#     return n
 
 # def get_opposites():
 # 	with open(impresources.files("DPMLM") / "data" / "opposites.json", 'r') as f:
