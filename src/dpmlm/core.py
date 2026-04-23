@@ -101,7 +101,7 @@ class DPMLM():
     nlp = None
     alpha = None
 
-    def __init__(self, MODEL="FacebookAI/roberta-base", alpha=0.003, IPI=False, IPI_model=None, PII=False, calibration=None):
+    def __init__(self, MODEL="FacebookAI/roberta-base", alpha=0.003, IPI=False, IPI_model=None, PII=False, calibration=None, hybrid=False, hybrid_budget=100):
         self.tokenizer = AutoTokenizer.from_pretrained(MODEL)
         self.max_context = (self.tokenizer.model_max_length // 2) - 32
 
@@ -128,6 +128,10 @@ class DPMLM():
 
         if PII == True:
             self.analyzer = AnalyzerEngine()
+
+        if hybrid == True:
+            self.hybrid = True
+            self.hybrid_budget = hybrid_budget
 
     def load_transformers(self):
         return self.tokenizer, self.lm_model
@@ -322,19 +326,21 @@ class DPMLM():
         perturbed = 0
         total = 0
         for i, (t, eps) in enumerate(zip(tokens, word_eps)):
-            # if i >= len(tokens):
-            #     break
-
             # if IPI or PII, skip non-IPI/PII tokens
+            skip = False
             if all_mask is not None and all_mask[i] == True:
-                total += 1
-                if tokens[i].isupper() == True:
-                    replace.append(t)
-                elif tokens[i][0].isupper() == True:
-                    replace.append(t.capitalize())
+                if self.hybrid == True:
+                    skip = True
+                    pass
                 else:
-                    replace.append(t)
-                continue
+                    total += 1
+                    if tokens[i].isupper() == True:
+                        replace.append(t)
+                    elif tokens[i][0].isupper() == True:
+                        replace.append(t.capitalize())
+                    else:
+                        replace.append(t)
+                    continue
 
             if (STOP == False and t in stop) or t in string.punctuation:
                 total += 1
@@ -344,7 +350,10 @@ class DPMLM():
                     replace.append(t)
                 continue
 
-            res = self.privatize(working_tokens, t, i, CONCAT=CONCAT, epsilon=eps)
+            if skip == True:
+                res = self.privatize(working_tokens, t, i, CONCAT=CONCAT, epsilon=self.hybrid_budget)
+            else:
+                res = self.privatize(working_tokens, t, i, CONCAT=CONCAT, epsilon=eps)
             r = res.get(f"{t}_{i}", t)
             
             if REPLACE:
@@ -425,14 +434,19 @@ class DPMLM():
             all_mask = None
 
         indices_to_process = []
-        word_eps = epsilon if isinstance(epsilon, list) else [epsilon] * len(tokens)
+        temp_eps = epsilon if isinstance(epsilon, list) else [epsilon] * len(tokens)
+        word_eps = []
 
         for i, t in enumerate(tokens):
-            if (all_mask and all_mask[i]) or \
-            (not STOP and t.lower() in stop) or \
-            (t in string.punctuation):
+            if (not STOP and t.lower() in stop) or (t in string.punctuation):
                 continue
-            indices_to_process.append(i)
+            elif (all_mask and all_mask[i]):
+                if self.hybrid == True:
+                    indices_to_process.append(i)
+                    word_eps.append(self.hybrid_budget)
+            else:
+                indices_to_process.append(i)
+                word_eps.append(temp_eps[i])
 
         res = self.privatize_batch(tokens, indices_to_process, epsilon=word_eps, CONCAT=CONCAT, batch_size=batch_size)
 
