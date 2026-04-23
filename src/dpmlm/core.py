@@ -10,7 +10,7 @@ import textspan
 
 from presidio_analyzer import AnalyzerEngine
 
-torch.backends.cuda.matmul.fp32_precision = 'medium'
+torch.backends.cuda.matmul.fp32_precision = 'tf32'
 
 logging.set_verbosity_warning()
 
