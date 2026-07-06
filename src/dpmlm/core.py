@@ -2,11 +2,10 @@ import torch
 import nltk
 import string
 import numpy as np
-from nltk.tokenize.treebank import TreebankWordDetokenizer
+from nltk.tokenize.treebank import TreebankWordDetokenizer, TreebankWordTokenizer
 from nltk.corpus import stopwords
 from nltk.stem.wordnet import WordNetLemmatizer
 from transformers import AutoModel, AutoTokenizer, AutoModelForMaskedLM, logging, pipeline
-import textspan
 
 from presidio_analyzer import AnalyzerEngine
 
@@ -30,21 +29,10 @@ def remove_at_index(token_list, index):
         new_tokens.pop(index)
     return new_tokens
 
-# def get_opposites():
-# 	with open(impresources.files("DPMLM") / "data" / "opposites.json", 'r') as f:
-# 		opposites = json.load(f)
-# 	return opposites
-
-# def get_vocab():
-# 	with open(impresources.files("DPMLM") / "data" / "vocab.txt", 'r') as f:
-# 		vocab = set([x.strip() for x in f.readlines()])
-# 	return vocab
-
 class DPMLM():
-    # opposites = get_opposites()
-    # vocab = get_vocab()
     lemmatizer = WordNetLemmatizer()
     detokenizer = TreebankWordDetokenizer()
+    nltk_tokenizer = TreebankWordTokenizer()
     tokenizer = None
     lm_model = None
     raw_model = None
@@ -83,6 +71,8 @@ class DPMLM():
         if hybrid == True:
             self.hybrid = True
             self.hybrid_budget = hybrid_budget
+        else:
+            self.hybrid = False
 
     def load_transformers(self):
         return self.tokenizer, self.lm_model
@@ -212,63 +202,57 @@ class DPMLM():
 
     def dpmlm_rewrite(self, sentence, epsilon, REPLACE=False, STOP=False, CONCAT=True, IPI=False, PII=False):
         sentence = " ".join(sentence.split("\n"))
-        tokens = nltk.word_tokenize(sentence)
 
+        pii_mask = []
         if PII == True:
             sentence = sentence.replace("<", "").replace(">", "")
             results = self.analyzer.analyze(text=sentence, language="en")
-            pii_spans = [(x.start, x.end) for x in results]
-            pii_types = [x.entity_type for x in results]
-            rep_spans = []
-            offset = 0
-            for s, t in zip(pii_spans, pii_types):
-                rep = "<" + t + ">"
-                rep_len = s[1] - s[0]
-                sentence = sentence[:s[0]+offset] + rep + sentence[s[1]+offset:]
-                offset = offset - rep_len + len(rep)
-                rep_spans.append((len(sentence[:s[0]]), len(sentence[:s[0]])+len(rep)))
+            
+            sorted_results = sorted(results, key=lambda x: x.start, reverse=True)
+            
+            placeholder_char_ranges = []
+            
+            for x in sorted_results:
+                rep = "<" + x.entity_type + ">"
+                sentence = sentence[:x.start] + rep + sentence[x.end:]
+                placeholder_char_ranges.append((x.start, x.start + len(rep)))
+                
             tokens = nltk.word_tokenize(sentence)
-            orig_spans = [x[0] for x in textspan.get_original_spans(tokens, sentence)]
-            pii_mask = []
-            started = False
-            for t, s in zip(tokens, orig_spans):
-                if t == "<":
-                    pii_mask.append(True)
-                    started = True
-                elif t == ">":
-                    pii_mask.append(True)
-                    started = False
-                else:
-                    if started == True:
-                        pii_mask.append(True)
-                    else:
-                        pii_mask.append(False)
+            
+            token_spans = list(self.nltk_tokenizer.span_tokenize(sentence))
+            
+            pii_mask = [False] * len(tokens)
+            for i, (tok_start, tok_end) in enumerate(token_spans):
+                for p_start, p_end in placeholder_char_ranges:
+                    if max(tok_start, p_start) < min(tok_end, p_end):
+                        pii_mask[i] = True
+                        break
         else:
-            pii_mask = None
+            tokens = nltk.word_tokenize(sentence)
+            token_spans = list(self.nltk_tokenizer.span_tokenize(sentence))
+            pii_mask = [False] * len(tokens)
 
+        ipi_mask = [False] * len(tokens)
+        ipi_entities = []
         if IPI == True:
             res = self.ipi_pipe(sentence)
             ipi_entities = [x["entity"] for x in res]
             ipi_spans = [(x["start"], x["end"]) for x in res]
-            orig_spans = [x[0] for x in textspan.get_original_spans(tokens, sentence)]
-            ipi_mask = [False if x in ipi_spans else True for x in orig_spans]
+            
+            for i, (tok_start, tok_end) in enumerate(token_spans):
+                for ipi_start, ipi_end in ipi_spans:
+                    if max(tok_start, ipi_start) < min(tok_end, ipi_end):
+                        ipi_mask[i] = True
+                        break
         else:
-            ipi_mask = None
+            ipi_mask = [True] * len(tokens)
 
-        if ipi_mask is not None and pii_mask is not None:
-            assert len(pii_mask) == len(ipi_mask)
-            all_mask = []
-            for x, y in zip(pii_mask, ipi_mask):
-                if x is True or y is True:
-                    all_mask.append(True)
-                else:
-                    all_mask.append(False)
-        elif ipi_mask is not None:
-            all_mask = ipi_mask
-        elif pii_mask is not None:
-            all_mask = pii_mask
-        else:
-            all_mask = None
+        all_mask = [False] * len(tokens)
+        for i in range(len(tokens)):
+            if PII and pii_mask[i]:
+                all_mask[i] = True
+            elif IPI and not ipi_mask[i]:
+                all_mask[i] = True
 
         word_eps = epsilon if isinstance(epsilon, list) else [epsilon] * len(tokens)
         replace = []
@@ -326,63 +310,57 @@ class DPMLM():
     
     def dpmlm_rewrite_batch(self, sentence, epsilon, STOP=False, CONCAT=True, batch_size=16, IPI=False, PII=False):
         sentence = " ".join(sentence.split("\n"))
-        tokens = nltk.word_tokenize(sentence)
 
+        pii_mask = []
         if PII == True:
             sentence = sentence.replace("<", "").replace(">", "")
             results = self.analyzer.analyze(text=sentence, language="en")
-            pii_spans = [(x.start, x.end) for x in results]
-            pii_types = [x.entity_type for x in results]
-            rep_spans = []
-            offset = 0
-            for s, t in zip(pii_spans, pii_types):
-                rep = "<" + t + ">"
-                rep_len = s[1] - s[0]
-                sentence = sentence[:s[0]+offset] + rep + sentence[s[1]+offset:]
-                offset = offset - rep_len + len(rep)
-                rep_spans.append((len(sentence[:s[0]]), len(sentence[:s[0]])+len(rep)))
+            
+            sorted_results = sorted(results, key=lambda x: x.start, reverse=True)
+            
+            placeholder_char_ranges = []
+            
+            for x in sorted_results:
+                rep = "<" + x.entity_type + ">"
+                sentence = sentence[:x.start] + rep + sentence[x.end:]
+                placeholder_char_ranges.append((x.start, x.start + len(rep)))
+                
             tokens = nltk.word_tokenize(sentence)
-            orig_spans = [x[0] for x in textspan.get_original_spans(tokens, sentence)]
-            pii_mask = []
-            started = False
-            for t, s in zip(tokens, orig_spans):
-                if t == "<":
-                    pii_mask.append(True)
-                    started = True
-                elif t == ">":
-                    pii_mask.append(True)
-                    started = False
-                else:
-                    if started == True:
-                        pii_mask.append(True)
-                    else:
-                        pii_mask.append(False)
+            
+            token_spans = list(self.nltk_tokenizer.span_tokenize(sentence))
+            
+            pii_mask = [False] * len(tokens)
+            for i, (tok_start, tok_end) in enumerate(token_spans):
+                for p_start, p_end in placeholder_char_ranges:
+                    if max(tok_start, p_start) < min(tok_end, p_end):
+                        pii_mask[i] = True
+                        break
         else:
-            pii_mask = None
+            tokens = nltk.word_tokenize(sentence)
+            token_spans = list(self.nltk_tokenizer.span_tokenize(sentence))
+            pii_mask = [False] * len(tokens)
 
+        ipi_mask = [False] * len(tokens)
+        ipi_entities = []
         if IPI == True:
             res = self.ipi_pipe(sentence)
             ipi_entities = [x["entity"] for x in res]
             ipi_spans = [(x["start"], x["end"]) for x in res]
-            orig_spans = [x[0] for x in textspan.get_original_spans(tokens, sentence)]
-            ipi_mask = [False if x in ipi_spans else True for x in orig_spans]
+            
+            for i, (tok_start, tok_end) in enumerate(token_spans):
+                for ipi_start, ipi_end in ipi_spans:
+                    if max(tok_start, ipi_start) < min(tok_end, ipi_end):
+                        ipi_mask[i] = True
+                        break
         else:
-            ipi_mask = None
+            ipi_mask = [True] * len(tokens)
 
-        if ipi_mask is not None and pii_mask is not None:
-            assert len(pii_mask) == len(ipi_mask)
-            all_mask = []
-            for x, y in zip(pii_mask, ipi_mask):
-                if x is True or y is True:
-                    all_mask.append(True)
-                else:
-                    all_mask.append(False)
-        elif ipi_mask is not None:
-            all_mask = ipi_mask
-        elif pii_mask is not None:
-            all_mask = pii_mask
-        else:
-            all_mask = None
+        all_mask = [False] * len(tokens)
+        for i in range(len(tokens)):
+            if PII and pii_mask[i]:
+                all_mask[i] = True
+            elif IPI and not ipi_mask[i]:
+                all_mask[i] = True
 
         indices_to_process = []
         temp_eps = epsilon if isinstance(epsilon, list) else [epsilon] * len(tokens)
