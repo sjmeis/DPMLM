@@ -73,7 +73,7 @@ def calculate_logit_bounds(model_name, batch_size=16, percentile=0.01, device=No
         clip_min, clip_max = bound_strategy(stats["mean"], stats["std"], stats["q_low"], stats["q_high"])
     else:
         # default is min and max
-        clip_min, clip_max = stats["q_high"], stats["q_high"]
+        clip_min, clip_max = stats["q_low"], stats["q_high"]
 
     return {
         "clip_min": float(clip_min),
