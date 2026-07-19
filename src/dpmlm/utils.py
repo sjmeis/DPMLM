@@ -75,6 +75,12 @@ def calculate_logit_bounds(model_name, batch_size=16, percentile=0.01, device=No
         # default is min and max
         clip_min, clip_max = stats["q_low"], stats["q_high"]
 
+
+    if float(abs(clip_max - clip_min)) == 0:
+        raise Exception("Your chosen bound strategy has resulted in a sensitivity of 0. DP-MLM will not work as expected / fail with a non-positive sensitivity.")
+    elif float(abs(clip_max - clip_min)) < 0:
+        raise Exception("Your chosen bound strategy has resulted in a sensitivity of less than 0. DP-MLM will not work as expected / fail with a non-positive sensitivity.")
+
     return {
         "clip_min": float(clip_min),
         "clip_max": float(clip_max),
