@@ -78,33 +78,49 @@ class DPMLM():
         return self.tokenizer, self.lm_model
 
     def privatize(self, token_list, target, start_index, CONCAT=True, epsilon=1):
-        max_word_context = self.max_context
-        lower_w, upper_w = self.sliding_window(token_list, start_index, max_word_context)
-        chunk_tokens = token_list[lower_w:upper_w]
-        relative_index = start_index - lower_w
+        masked_tokens = replace_at_index(token_list, start_index, self.tokenizer.mask_token)
+        masked_sent_full = self.detokenizer.detokenize(masked_tokens)
+        
+        # Encode to sub-token space without adding special tokens yet
+        encoded_masked = self.tokenizer.encode(masked_sent_full, add_special_tokens=False)
 
-        # Masks the target word in the original sentence.
-        masked_tokens = replace_at_index(chunk_tokens, relative_index, self.tokenizer.mask_token)
-        masked_sent = self.detokenizer.detokenize(masked_tokens)
+        try:
+            mask_id_idx = encoded_masked.index(self.tokenizer.mask_token_id)
+        except ValueError:
+            mask_id_idx = len(encoded_masked) // 2
+
+        # Calculate exact sub-token budget per chunk
+        # If CONCAT=True, allocate half budget (minus room for <s>, </s>)
+        budget = (self.tokenizer.model_max_length - 8) // 2 if CONCAT else (self.tokenizer.model_max_length - 4)
+
+        # Slide window in sub-token space (!)
+        lower, upper = self.sliding_window(encoded_masked, mask_id_idx, budget)
+        windowed_masked_ids = encoded_masked[lower:upper]
+        masked_chunk_sent = self.tokenizer.decode(windowed_masked_ids, skip_special_tokens=False)
 
         #Get the input token IDs of the input consisting of: the original sentence + separator + the masked sentence.
         if CONCAT == False:
-            input_ids = self.tokenizer.encode(" "+masked_sent, add_special_tokens=True, truncation=True, max_length=self.tokenizer.model_max_length)
+            input_ids = self.tokenizer.encode(" "+masked_chunk_sent, add_special_tokens=True, truncation=True, max_length=self.tokenizer.model_max_length)
         else:
-            original_sent_clean = self.detokenizer.detokenize(chunk_tokens)
-            input_ids = self.tokenizer.encode(" " + original_sent_clean, " " + masked_sent, add_special_tokens=True, truncation="only_first", max_length=self.tokenizer.model_max_length)
+            clean_sent_full = self.detokenizer.detokenize(token_list)
+            encoded_clean = self.tokenizer.encode(clean_sent_full, add_special_tokens=False)
+            
+            # Extract identical sub-token window from clean text
+            windowed_clean_ids = encoded_clean[lower:upper]
+            clean_chunk_sent = self.tokenizer.decode(windowed_clean_ids, skip_special_tokens=False)
+            input_ids = self.tokenizer.encode(" " + clean_chunk_sent, " " + masked_chunk_sent, add_special_tokens=True, truncation="longest_first", max_length=self.tokenizer.model_max_length)
 
         try:
             masked_position = input_ids.index(self.tokenizer.mask_token_id)
         except ValueError:
             return {"{}_{}".format(target, start_index): target}
 
-        #Get the predictions of the Masked LM transformer.
+        # Get the predictions of the Masked LM transformer.
         with torch.no_grad():
             output = self.lm_model(torch.tensor(input_ids).reshape(1, len(input_ids)).to(self.device))
             mask_logits = output.logits[0, masked_position].squeeze().cpu().numpy()
 
-        #Get top guesses: their token IDs, scores, and words.
+        # Get top guesses: token IDs, scores, and words.
         mask_logits = np.clip(mask_logits, self.clip_min, self.clip_max)
         mask_logits = mask_logits / (2 * self.sensitivity / epsilon)
 
@@ -120,6 +136,10 @@ class DPMLM():
     def privatize_batch(self, tokens, indices, epsilon, CONCAT=True, batch_size=16):
         predictions = {}
 
+        clean_sent_full = self.detokenizer.detokenize(tokens)
+        encoded_clean = self.tokenizer.encode(clean_sent_full, add_special_tokens=False) if CONCAT else None
+        budget = (self.tokenizer.model_max_length - 8) // 2 if CONCAT else (self.tokenizer.model_max_length - 4)
+
         for k in range(0, len(indices), batch_size):
             batch_indices = indices[k : k + batch_size]
             batch_eps = epsilon[k : k + batch_size]
@@ -129,23 +149,25 @@ class DPMLM():
             
             for idx in batch_indices:
                 masked_tokens = replace_at_index(tokens, idx, self.tokenizer.mask_token)
-                
-                max_word_context = self.max_context 
-                lower_w, upper_w = self.sliding_window(tokens, idx, max_word_context)
-                
-                chunk_tokens = tokens[lower_w:upper_w]
-                masked_chunk_tokens = masked_tokens[lower_w:upper_w]
-                rel_idx = idx - lower_w
+                masked_sent_full = self.detokenizer.detokenize(masked_tokens)
 
-                masked_chunk_tokens = replace_at_index(chunk_tokens, rel_idx, self.tokenizer.mask_token)
+                # Encode full masked text to sub-token IDs
+                encoded_masked = self.tokenizer.encode(masked_sent_full, add_special_tokens=False)
                 
-                clean_chunk_sent = self.detokenizer.detokenize(chunk_tokens)
-                masked_chunk_sent = self.detokenizer.detokenize(masked_chunk_tokens)
+                try:
+                    m_sub_idx = encoded_masked.index(self.tokenizer.mask_token_id)
+                except ValueError:
+                    m_sub_idx = len(encoded_masked) // 2
+                
+                lower, upper = self.sliding_window(encoded_masked, m_sub_idx, budget)
+                
+                masked_chunk_sent = self.tokenizer.decode(encoded_masked[lower:upper], skip_special_tokens=False)
                 
                 if CONCAT == False:
                     input_ids = self.tokenizer.encode(" " + masked_chunk_sent, add_special_tokens=True, truncation=True, max_length=self.tokenizer.model_max_length)
                 else:
-                    input_ids = self.tokenizer.encode(" " + clean_chunk_sent, " " + masked_chunk_sent, add_special_tokens=True, truncation="only_first", max_length=self.tokenizer.model_max_length)
+                    clean_chunk_sent = self.tokenizer.decode(encoded_clean[lower:upper], skip_special_tokens=False)
+                    input_ids = self.tokenizer.encode(" " + clean_chunk_sent, " " + masked_chunk_sent, add_special_tokens=True, truncation="longest_first", max_length=self.tokenizer.model_max_length)
                 
                 try:
                     m_pos = input_ids.index(self.tokenizer.mask_token_id)
