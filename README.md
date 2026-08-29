@@ -68,8 +68,27 @@ M.dpmlm_rewrite_batch("Large document text...", epsilon=25, batch_size=16)
 
 Depending on your setup, you may need to tweak the `batch_size` parameter for the most optimal performance gains.
 
+### Handling Direct and Indirect Identifiers
+The `DP-IPI` extension of `DP-MLM` follows from research work (see below) that targets specifically the privatization of indirect personally identifiers in texts.
+
+To activate this feature, you must instantiate `DP-MLM` accordingly:
+
+```python
+M = DPMLM(MODEL="FacebookAI/roberta-base", calibration=bounds, bound_strategy=None, IPI=TRUE, PII=True)
+```
+
+`PII` mode uses Presidio to mask out personally identifiable information, thereby following strict redaction and bypassing `DP-MLM`.
+
+In `IPI` mode, **only** tokens tagged as indirect personal identifiers are privatized. This is determined by a specified fine-tuned IPI detection model. We provide a default one, but you can also specify your own with `IPI_model`.
+
+In both cases, you must also set flags when calling rewrite functions, e.g.:
+
+```python
+private_text = M.dpmlm_rewrite("Hello world, this is a private text.", epsilon=25, IPI=True, PII=False)
+```
+
 ### Input Document Length
-As of the newest 2025 release, `DP-MLM` no longer has the shortcoming of the 512 token context window (256 with concatentation), which was due to the limitations of MLM context windows.
+As of a release in 2025, `DP-MLM` no longer has the shortcoming of the 512 token context window (256 with concatentation), which was due to the limitations of MLM context windows.
 
 Now, `DP-MLM` operates with a *sliding window*, where the maximum context is given, centered around the target word to be privatized. Thus, `DP-MLM` now works on arbitrarily long documents!
 
@@ -107,4 +126,10 @@ Please consider citing the original work that introduced `DP-MLM`. Thank you!
     doi = "10.18653/v1/2024.findings-acl.554",
     pages = "9314--9328"
 }
+```
+
+If you use the `DP-IPI` variant, please cite:
+
+```
+Coming soon!
 ```

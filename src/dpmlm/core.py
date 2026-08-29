@@ -5,7 +5,7 @@ import numpy as np
 from nltk.tokenize.treebank import TreebankWordDetokenizer, TreebankWordTokenizer
 from nltk.corpus import stopwords
 from nltk.stem.wordnet import WordNetLemmatizer
-from transformers import AutoModel, AutoTokenizer, AutoModelForMaskedLM, logging, pipeline
+from transformers import AutoTokenizer, AutoModelForMaskedLM, logging, pipeline
 
 from presidio_analyzer import AnalyzerEngine
 
@@ -40,7 +40,13 @@ class DPMLM():
     nlp = None
     alpha = None
 
-    def __init__(self, MODEL="FacebookAI/roberta-base", alpha=0.003, IPI=False, IPI_model=None, PII=False, calibration=None, hybrid=False, hybrid_budget=100):
+    def __init__(self, 
+                 MODEL="FacebookAI/roberta-base", 
+                 alpha=0.003, 
+                 IPI=False, IPI_model="Ibrahimbaroud/roberta-large-ipi-mimiciii", 
+                 PII=False, 
+                 calibration=None, 
+                 hybrid=False, hybrid_budget=100):
         self.tokenizer = AutoTokenizer.from_pretrained(MODEL)
         self.max_context = (self.tokenizer.model_max_length // 2) - 32
 
