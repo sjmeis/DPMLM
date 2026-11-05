@@ -10,6 +10,8 @@
 
 This is the code and package repository for the ACL 2024 Findings paper: *DP-MLM: Differentially Private Text Rewriting Using Masked Language Models*
 
+Updated for the addition of `DP-IPI`, from the EMNLP 2026 Findings paper *DP-IPI: A Hybrid Differential Privacy Text Rewriting Mechanism for Indirect Personal Identifiers in Clinical Texts*
+
 ## Setup
 ### Installation
 You can install the package directly using:
@@ -131,5 +133,25 @@ Please consider citing the original work that introduced `DP-MLM`. Thank you!
 If you use the `DP-IPI` variant, please cite:
 
 ```
-Coming soon!
+@inproceedings{baroud-etal-2026-dp,
+    title = "{DP}-{IPI}: A Hybrid Differential Privacy Text Rewriting Mechanism for Indirect Personal Identifiers in Clinical Texts",
+    author = {Baroud, Ibrahim  and
+      Meisenbacher, Stephen  and
+      M{\"o}ller, Sebastian  and
+      Matthes, Florian  and
+      Roller, Roland},
+    editor = "Lee, Hung-Yi  and
+      Dev, Sunipa  and
+      Li, Jessy  and
+      Elliott, Desmond",
+    booktitle = "Findings of the {A}ssociation for {C}omputational {L}inguistics: {EMNLP} 2026",
+    month = oct,
+    year = "2026",
+    address = "Budapest, Hungary",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2026.findings-emnlp.2156/",
+    doi = "10.18653/2026.findings-emnlp.2156",
+    pages = "46129--46143",
+    ISBN = "979-8-89176-462-0"
+}
 ```
